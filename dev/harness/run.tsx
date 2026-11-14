@@ -6,7 +6,7 @@
 //   bun --preload <repo>/dev/harness/preload.ts <repo>/dev/harness/run.tsx
 //
 // MODE env switches scenarios: normal, slow, nextfail, bulkfail, freeze,
-// failover, outage, error, statuses.
+// failover, outage, error, statuses, clibulk.
 
 import { render } from "ink";
 
@@ -21,6 +21,7 @@ import type { RecoveringDownloadService } from "../../src/api/download/recoverin
 import type { DownloadCallbacks, DownloadOutcome, SourceFailure } from "../../src/api/download/types";
 import { DownloadStatus } from "../../src/download-statuses";
 import { SEARCH_PAGE_SIZE } from "../../src/settings";
+import { LAYOUT_KEY } from "../../src/tui/layouts/keys";
 import objectHash from "object-hash";
 
 type Mode =
@@ -32,7 +33,8 @@ type Mode =
   | "failover"
   | "outage"
   | "error"
-  | "statuses";
+  | "statuses"
+  | "clibulk";
 
 const MODE = (process.env.MODE ?? "normal") as Mode;
 
@@ -132,7 +134,7 @@ const fakeRecoveringDownloadService = (): RecoveringDownloadService => {
     const filename = `${md5.slice(0, 8)}.pdf`;
     const chunk = Buffer.alloc(DOWNLOAD_TOTAL / 10);
 
-    if (MODE === "bulkfail" && md5.startsWith("11")) {
+    if ((MODE === "bulkfail" || MODE === "clibulk") && md5.startsWith("11")) {
       await sleep(DOWNLOAD_CHUNK_PAUSE_MS);
       return {
         downloaded: false,
@@ -209,6 +211,11 @@ const seedStore = () => {
     patch.errorMessage = "Simulated fatal error (MODE=error)";
   }
 
+  if (MODE === "clibulk") {
+    patch.CLIMode = true;
+    patch.activeLayout = LAYOUT_KEY.BULK_DOWNLOAD_LAYOUT;
+  }
+
   if (MODE === "statuses") {
     // Row-status mix for the §5.1/§5.2 captures: item 1 done, item 2
     // downloading at 42%, item 4 queued, item 9 failed, items 3/5/7 selected
@@ -245,5 +252,22 @@ const seedStore = () => {
   useBoundStore.setState(patch);
 };
 
+// MODE=clibulk exercises the CLI `--bulk` path (spec §5.8: the old
+// BULK_DOWNLOAD_LAYOUT must keep rendering when CLIMode is true). Like
+// src/cli/operate.ts minus the network steps: CLIMode + initial layout set,
+// then the real startBulkDownloadInCLI runs the real bulk flow against the
+// fake download service and exits via handleExit when done. The MD5 list is
+// inline instead of read from a file, and fetchConfig is skipped (the fake
+// mirrors are seeded below).
+const CLI_MD5_LIST = [
+  "1100000000000000000000000000000a",
+  "02000000000000000000000000000002",
+  "03000000000000000000000000000003",
+];
+
 seedStore();
 render(<App doNotFetchConfigInitially={true} />);
+
+if (MODE === "clibulk") {
+  useBoundStore.getState().startBulkDownloadInCLI(CLI_MD5_LIST);
+}

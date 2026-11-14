@@ -39,10 +39,11 @@ export class BulkDownloadFlow {
           }
         );
       if (!outcome.downloaded) {
-        this.get().setWarningMessage(
-          `Couldn't download ${item.md5}: ${summarizeFailures(outcome.failures)}`
-        );
-        this.get().onBulkQueueItemFail(index);
+        // The Queue panel's red reason row reads this summary from
+        // bulkFailureReasons (spec §5.3).
+        const reason = summarizeFailures(outcome.failures);
+        this.get().setWarningMessage(`Couldn't download ${item.md5}: ${reason}`);
+        this.get().onBulkQueueItemFail(index, reason);
         return;
       }
       this.get().onBulkQueueItemComplete(index);

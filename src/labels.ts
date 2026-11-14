@@ -65,6 +65,16 @@ export const Label = {
     ["b", "bulk dl"],
     ["?", "help"],
   ] as ReadonlyArray<readonly [string, string]>,
+  FOOTER_QUEUE: [
+    ["v", "detail"],
+    ["↑↓", "move"],
+    ["x", "remove"],
+    ["r", "retry failed"],
+    ["space", "bulk"],
+    ["/", "search"],
+    ["?", "help"],
+    ["q", "quit"],
+  ] as ReadonlyArray<readonly [string, string]>,
   FOOTER_HELP: [["esc", "close help"]] as ReadonlyArray<readonly [string, string]>,
   FOOTER_QUIT: [
     ["y", "quit"],
@@ -120,6 +130,20 @@ export const Label = {
     ["space", "bulk"],
     ["d", "download"],
     ["enter", "full screen"],
+  ] as ReadonlyArray<readonly [string, string]>,
+
+  // Queue panel (spec §3, §5.3): section titles, the run summary words, the
+  // saved-to line and the pinned bottom hint.
+  QUEUE_SECTION_BULK: "Bulk download",
+  QUEUE_SECTION_DIRECT: "Direct downloads",
+  QUEUE_SAVED_TO: "Saved to",
+  QUEUE_LISTS_PREFIX: "Lists:",
+  QUEUE_SUMMARY_DONE_WORD: "done",
+  QUEUE_SUMMARY_FAILED_WORD: "failed",
+  QUEUE_PANEL_HINTS: [
+    ["x", "remove"],
+    ["r", "retry failed"],
+    ["esc", "back"],
   ] as ReadonlyArray<readonly [string, string]>,
 
   // Help overlay (spec §5.5). Rows are [keys, description] pairs; keys render

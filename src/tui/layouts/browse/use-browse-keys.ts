@@ -4,6 +4,7 @@ import objectHash from "object-hash";
 import type { Entry } from "../../../api/models/entry";
 import { Label } from "../../../labels";
 import { useBoundStore } from "../../store";
+import { buildQueueModel, type QueueModel } from "./queue-rows";
 
 // Spec §4: PgUp/PgDn move the cursor 10 rows.
 const PAGE_STEP = 10;
@@ -23,6 +24,12 @@ interface KeyActions {
   leaveFullDetail: () => void;
   requestQuit: () => void;
   handleExit: () => void;
+  enterQueue: () => void;
+  leaveQueue: () => void;
+  moveQueueCursor: (delta: number) => void;
+  removeBulkUnderCursor: () => void;
+  retryFailedBulk: () => void;
+  actOnCursorEntry: (action: "toggle" | "download") => void;
 }
 
 // Keys in `list` mode (spec §4). `cursorEntry` is the entry under the cursor;
@@ -102,6 +109,69 @@ const handleListKeys = (
     return;
   }
 
+  if (input === "v") {
+    actions.enterQueue();
+    return;
+  }
+
+  if (input === "?") {
+    actions.openHelp();
+    return;
+  }
+
+  if (input === "q") {
+    actions.requestQuit();
+  }
+};
+
+// Keys in `queue` mode (spec §4): the cursor moves over the panel's
+// actionable rows, `x` removes the cursor item from the bulk selection before
+// a run starts, `r` retries a finished run's failures, `d`/`space` act on the
+// cursor entry when it maps to a result, and esc/v return to list mode with
+// the Detail panel. While the availability banner is active it owns esc (M3's
+// recorded semantics: the banner keeps esc in list/queue modes), so esc only
+// stops the wait and does not also close the panel.
+const handleQueueKeys = (input: string, key: Key, actions: KeyActions, bannerActive: boolean): void => {
+  if (key.upArrow || input === "k") {
+    actions.moveQueueCursor(-1);
+    return;
+  }
+
+  if (key.downArrow || input === "j") {
+    actions.moveQueueCursor(1);
+    return;
+  }
+
+  if (input === "x") {
+    actions.removeBulkUnderCursor();
+    return;
+  }
+
+  if (input === "r") {
+    actions.retryFailedBulk();
+    return;
+  }
+
+  if (input === " ") {
+    actions.actOnCursorEntry("toggle");
+    return;
+  }
+
+  if (input === "d") {
+    actions.actOnCursorEntry("download");
+    return;
+  }
+
+  if (key.escape && !bannerActive) {
+    actions.leaveQueue();
+    return;
+  }
+
+  if (input === "v") {
+    actions.leaveQueue();
+    return;
+  }
+
   if (input === "?") {
     actions.openHelp();
     return;
@@ -169,6 +239,29 @@ const handleQuitKeys = (input: string, key: Key, actions: KeyActions): void => {
   }
 };
 
+// The queue panel's actionable rows, rebuilt from the freshest store state
+// per keypress (download ticks mutate it between renders).
+const queueModel = (): QueueModel => {
+  const store = useBoundStore.getState();
+  return buildQueueModel({
+    entries: store.entries,
+    mirrorAdapter: store.mirrorAdapter,
+    bulkDownloadSelectedEntries: store.bulkDownloadSelectedEntries,
+    bulkDownloadQueue: store.bulkDownloadQueue,
+    bulkFailureReasons: store.bulkFailureReasons,
+    downloadProgressMap: store.downloadProgressMap,
+    downloadDirectory: process.cwd(),
+    createdMD5ListFileName: store.createdMD5ListFileName,
+    createdFailedMD5ListFileName: store.createdFailedMD5ListFileName,
+  });
+};
+
+const queueRowAtCursor = (model: QueueModel) => {
+  const store = useBoundStore.getState();
+  const maxRow = Math.max(model.actions.length - 1, 0);
+  return model.actions[Math.min(Math.max(store.queueCursor, 0), maxRow)];
+};
+
 // The single `useInput` router of the browse screen (spec §4): every key
 // dispatches on the current focus mode, and no component below the router
 // registers its own `useInput` for these keys.
@@ -181,8 +274,6 @@ export function useBrowseKeys() {
   const nextPageStatus = useBoundStore((state) => state.nextPageStatus);
   const searchValue = useBoundStore((state) => state.searchValue);
   const bulkDownloadSelectedEntries = useBoundStore((state) => state.bulkDownloadSelectedEntries);
-  const bulkDownloadQueue = useBoundStore((state) => state.bulkDownloadQueue);
-  const isBulkDownloadComplete = useBoundStore((state) => state.isBulkDownloadComplete);
 
   const moveCursor = useBoundStore((state) => state.moveCursor);
   const setCursorToEdge = useBoundStore((state) => state.setCursorToEdge);
@@ -197,8 +288,18 @@ export function useBrowseKeys() {
   const openOverlay = useBoundStore((state) => state.openOverlay);
   const closeOverlay = useBoundStore((state) => state.closeOverlay);
   const setBrowseFocus = useBoundStore((state) => state.setBrowseFocus);
+  const toggleSidePanel = useBoundStore((state) => state.toggleSidePanel);
+  const setQueueCursor = useBoundStore((state) => state.setQueueCursor);
   const requestQuit = useBoundStore((state) => state.requestQuit);
   const handleExit = useBoundStore((state) => state.handleExit);
+
+  const toggleBulkSelectionFor = (entry: Entry): void => {
+    if (bulkDownloadSelectedEntries[objectHash(entry)]) {
+      removeFromBulkDownloadQueue(entry);
+      return;
+    }
+    addToBulkDownloadQueue(entry);
+  };
 
   useInput((input, key) => {
     // The entry under the cursor, clamped the same way the results panel and
@@ -210,20 +311,10 @@ export function useBrowseKeys() {
     }
     const cursorEntry = entries[cursor];
 
-    // Whether a bulk run is downloading right now (spec §4's `b` guard; the
-    // same condition M4's startBulkDownload guard uses).
-    const bulkRunRunning = bulkDownloadQueue.length > 0 && !isBulkDownloadComplete;
-
     const actions: KeyActions = {
       moveCursor,
       setCursorToEdge,
-      toggleBulkSelection: (entry) => {
-        if (bulkDownloadSelectedEntries[objectHash(entry)]) {
-          removeFromBulkDownloadQueue(entry);
-          return;
-        }
-        addToBulkDownloadQueue(entry);
-      },
+      toggleBulkSelection: toggleBulkSelectionFor,
       // pushDownloadQueue already no-ops for an entry that is queued or
       // downloading; a settled entry may be downloaded again (spec §8.4).
       downloadEntry: (entry) => {
@@ -258,14 +349,10 @@ export function useBrowseKeys() {
           }
         }
       },
+      // The running and empty-selection guards live in startBulkDownload
+      // itself (spec §6.1); the store also moves focus to the Queue panel in
+      // interactive mode.
       startBulkDownload: () => {
-        if (bulkRunRunning) {
-          setWarningMessage(Label.BULK_ALREADY_RUNNING);
-          return;
-        }
-        // An empty selection keeps startBulkDownload's own "queue is empty"
-        // warning; at this milestone the run still lands on the old bulk
-        // screen (spec §7.4, M3), so browseFocus stays untouched.
         startBulkDownload();
       },
       openHelp: () => {
@@ -280,6 +367,60 @@ export function useBrowseKeys() {
       },
       requestQuit,
       handleExit,
+      // `v` from list mode (spec §4): toggle the side panel to Queue and move
+      // the focus with it.
+      enterQueue: () => {
+        const store = useBoundStore.getState();
+        toggleSidePanel();
+        if (store.sidePanel === "detail") {
+          setQueueCursor(0);
+          setBrowseFocus("queue");
+          return;
+        }
+        setBrowseFocus("list");
+      },
+      // esc or `v` from queue mode: back to list mode with the Detail panel.
+      leaveQueue: () => {
+        toggleSidePanel();
+        setBrowseFocus("list");
+      },
+      moveQueueCursor: (delta) => {
+        const model = queueModel();
+        const maxRow = Math.max(model.actions.length - 1, 0);
+        const current = useBoundStore.getState().queueCursor;
+        setQueueCursor(Math.min(Math.max(current + delta, 0), maxRow));
+      },
+      // Before a run starts only (spec §4): the hint renders dim during a
+      // run and the key is ignored there.
+      removeBulkUnderCursor: () => {
+        const store = useBoundStore.getState();
+        if (store.bulkDownloadQueue.length > 0 && !store.isBulkDownloadComplete) {
+          return;
+        }
+        const row = queueRowAtCursor(queueModel());
+        if (row?.type === "bulk" && row.selected && row.entry) {
+          removeFromBulkDownloadQueue(row.entry);
+        }
+      },
+      // Only for a finished run that has failures (spec §4); otherwise a
+      // no-op.
+      retryFailedBulk: () => {
+        const store = useBoundStore.getState();
+        if (store.isBulkDownloadComplete && store.failedBulkDownloadItemCount > 0) {
+          store.retryFailedBulkDownloads();
+        }
+      },
+      actOnCursorEntry: (action) => {
+        const row = queueRowAtCursor(queueModel());
+        if (!row?.entry) {
+          return;
+        }
+        if (action === "download") {
+          pushDownloadQueue(row.entry);
+          return;
+        }
+        toggleBulkSelectionFor(row.entry);
+      },
     };
 
     switch (browseFocus) {
@@ -293,6 +434,14 @@ export function useBrowseKeys() {
           break;
         }
         handleListKeys(input, key, actions, cursorEntry);
+        break;
+      }
+      case "queue": {
+        if (isLoading && input !== "q" && input !== "?") {
+          break;
+        }
+        const bannerActive = useBoundStore.getState().availabilityStatus.state !== "available";
+        handleQueueKeys(input, key, actions, bannerActive);
         break;
       }
       case "fullDetail": {

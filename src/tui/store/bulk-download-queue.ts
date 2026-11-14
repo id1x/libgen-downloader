@@ -1,6 +1,7 @@
 import { TCombinedStore } from "./index";
 import { Entry } from "../../api/models/entry";
 import { DownloadStatus } from "../../download-statuses";
+import { Label } from "../../labels";
 import { LAYOUT_KEY } from "../layouts/keys";
 import { IDownloadProgress } from "./download-queue";
 import { createFailedMD5ListFile, createMD5ListFile } from "../../api/data/file";
@@ -24,6 +25,9 @@ export interface IBulkDownloadQueueState {
 
   bulkDownloadSelectedEntries: Record<string, Entry>;
   bulkDownloadQueue: IBulkDownloadQueueItem[];
+  // Last failure text per MD5, filled where BulkDownloadFlow builds the
+  // failure warning (spec §5.3); the Queue panel's red reason row reads it.
+  bulkFailureReasons: Record<string, string>;
 
   addToBulkDownloadQueue: (entry: Entry) => void;
   removeFromBulkDownloadQueue: (entry: Entry) => void;
@@ -32,11 +36,12 @@ export interface IBulkDownloadQueueState {
   onBulkQueueItemStart: (index: number, filename: string, total: number) => void;
   onBulkQueueItemData: (index: number, filename: string, chunk: Buffer, total: number) => void;
   onBulkQueueItemComplete: (index: number) => void;
-  onBulkQueueItemFail: (index: number) => void;
+  onBulkQueueItemFail: (index: number, reason?: string) => void;
   operateBulkDownloadQueue: () => Promise<void>;
   retryFailedBulkDownloads: () => Promise<void>;
   resetBulkQueueItems: (indexes: number[]) => void;
   writeBulkDownloadReports: () => Promise<void>;
+  settleBulkRun: () => void;
   returnToListKeepingFailedSelected: () => void;
   startBulkDownload: () => Promise<void>;
   startBulkDownloadInCLI: (md5List: string[]) => Promise<void>;
@@ -54,6 +59,7 @@ export const initialBulkDownloadQueueState = {
 
   bulkDownloadSelectedEntries: {},
   bulkDownloadQueue: [],
+  bulkFailureReasons: {},
 };
 
 export const createBulkDownloadQueueStateSlice = (
@@ -148,13 +154,20 @@ export const createBulkDownloadQueueStateSlice = (
       }));
     },
 
-    onBulkQueueItemFail: (index: number) => {
-      set((previous) => ({
-        bulkDownloadQueue: patchQueueItem(previous.bulkDownloadQueue, index, () => ({
-          status: DownloadStatus.FAILED,
-        })),
-        failedBulkDownloadItemCount: previous.failedBulkDownloadItemCount + 1,
-      }));
+    onBulkQueueItemFail: (index: number, reason?: string) => {
+      set((previous) => {
+        const patch: Partial<TCombinedStore> = {
+          bulkDownloadQueue: patchQueueItem(previous.bulkDownloadQueue, index, () => ({
+            status: DownloadStatus.FAILED,
+          })),
+          failedBulkDownloadItemCount: previous.failedBulkDownloadItemCount + 1,
+        };
+        const item = previous.bulkDownloadQueue[index];
+        if (item && reason) {
+          patch.bulkFailureReasons = { ...previous.bulkFailureReasons, [item.md5]: reason };
+        }
+        return patch;
+      });
     },
 
     operateBulkDownloadQueue: async () => {
@@ -172,6 +185,14 @@ export const createBulkDownloadQueueStateSlice = (
 
       set({ isBulkDownloadComplete: true });
       await get().writeBulkDownloadReports();
+
+      // Spec §6.1: in interactive mode the run settles in place — completed
+      // entries leave the selection, failed ones stay selected for `r`, and
+      // the queue stays for display until the next `b` replaces it. CLI mode
+      // has no selection to settle.
+      if (!get().CLIMode) {
+        get().settleBulkRun();
+      }
     },
 
     retryFailedBulkDownloads: async () => {
@@ -197,7 +218,31 @@ export const createBulkDownloadQueueStateSlice = (
           previous.failedBulkDownloadItemCount -
             indexes.filter((index) => isFailed(previous.bulkDownloadQueue[index])).length
         ),
+        // Retried items lose their stored reason; a fresh failure writes a
+        // fresh one, so no stale red row lingers under a retrying item.
+        bulkFailureReasons: Object.fromEntries(
+          Object.entries(previous.bulkFailureReasons).filter(([md5]) => {
+            return !indexes.some((index) => previous.bulkDownloadQueue[index]?.md5 === md5);
+          })
+        ),
       }));
+    },
+
+    // Spec §6.1: remove completed entries from the selection, keep failed
+    // ones selected, and keep the queue for display until the next `b`.
+    settleBulkRun: () => {
+      const store = get();
+      const completedMD5s = new Set(
+        store.bulkDownloadQueue.filter((item) => isCompleted(item)).map((item) => item.md5)
+      );
+      const remainingSelections: Record<string, Entry> = {};
+      for (const [hash, entry] of Object.entries(store.bulkDownloadSelectedEntries)) {
+        const md5 = store.mirrorAdapter?.getEntryMD5(entry) ?? "";
+        if (!completedMD5s.has(md5)) {
+          remainingSelections[hash] = entry;
+        }
+      }
+      set({ bulkDownloadSelectedEntries: remainingSelections });
     },
 
     writeBulkDownloadReports: async () => {
@@ -250,9 +295,18 @@ export const createBulkDownloadQueueStateSlice = (
     },
 
     startBulkDownload: async () => {
-      const entries = Object.values(get().bulkDownloadSelectedEntries);
+      const store = get();
+
+      // Spec §4: a run already active warns instead of starting again. (The
+      // same condition the quit prompt uses for its bulk-run line.)
+      if (store.bulkDownloadQueue.length > 0 && !store.isBulkDownloadComplete) {
+        store.setWarningMessage(Label.BULK_ALREADY_RUNNING);
+        return;
+      }
+
+      const entries = Object.values(store.bulkDownloadSelectedEntries);
       if (entries.length === 0) {
-        get().setWarningMessage("Bulk download queue is empty");
+        store.setWarningMessage("Bulk download queue is empty");
         return;
       }
 
@@ -262,8 +316,17 @@ export const createBulkDownloadQueueStateSlice = (
         createdMD5ListFileName: "",
         createdFailedMD5ListFileName: "",
         isBulkDownloadComplete: false,
+        bulkFailureReasons: {},
       });
-      get().setActiveLayout(LAYOUT_KEY.BULK_DOWNLOAD_LAYOUT);
+
+      // Spec §6.1: interactive bulk stays on the browse screen — the Queue
+      // panel opens in place (side panel + focus move to queue, M3's
+      // recorded deferral); CLI mode keeps the old bulk screen.
+      if (store.CLIMode) {
+        get().setActiveLayout(LAYOUT_KEY.BULK_DOWNLOAD_LAYOUT);
+      } else {
+        set({ sidePanel: "queue", browseFocus: "queue", queueCursor: 0 });
+      }
       get().allowWaitingForLibgen();
 
       // initialize bulk queue

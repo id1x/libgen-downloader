@@ -199,3 +199,81 @@ code or left a case unclear. Smallest-change choices, newest last.
   (the banner's counters tick), and stopping the wait gives up into the
   fatal-error screen. The seeded waiting status is kept as the pre-show
   (supersedes the M0 note's outage description).
+
+- **M4, the running guard moved into `startBulkDownload`** — as M3 recorded,
+  §6.1 puts the "run already active" guard in the store action; the key
+  router's own guard is gone and `b` now just calls `startBulkDownload()`.
+  The warning (`Bulk download already running`) is unchanged. On start the
+  action also sets `sidePanel = "queue"`, `browseFocus = "queue"` and
+  `queueCursor = 0` when `!CLIMode`, and clears `bulkFailureReasons` so a new
+  run cannot inherit the previous run's red rows.
+
+- **M4, `x` after a settled run** — §4 says `x` works "only before a run
+  starts; during a run render `x` dim and ignore". Read as: `x` is inert
+  while a run is in flight (`bulkDownloadQueue.length > 0 &&
+  !isBulkDownloadComplete`, the same "run active" condition used everywhere
+  else) and live again once the run has settled. Post-settle the completed
+  rows are deselected (nothing for `x` to remove, key no-ops there) and the
+  failed rows are still selected, so `x` can drop one without reaching for
+  `b`. The key also no-ops for rows that map to no selected entry.
+
+- **M4, `bulkFailureReasons` lifecycle** — filled by `onBulkQueueItemFail`
+  with the `summarizeFailures` string the flow already builds (the mock's
+  reason row shows exactly that text, not the full `Couldn't download …`
+  warning). `resetBulkQueueItems` drops the reasons of the items it resets,
+  so a retried item does not show a stale red row under its ⋯/⠋ status; a
+  fresh failure writes a fresh reason (last failure wins per MD5).
+
+- **M4, `settleBulkRun` keeps entries with no queue outcome selected** —
+  §6.1 says "remove completed entries, keep failed ones selected"; an entry
+  that never entered the queue (no MD5 found at `b` time) has no outcome, is
+  not completed, and stays selected. Settle runs after
+  `writeBulkDownloadReports` at the end of `operateBulkDownloadQueue` when
+  `!CLIMode`; CLI mode never settles (nothing interactive is selected).
+
+- **M4, no speed anywhere** — §3 tells both the header variant and the queue
+  panel to drop the speed term when it is not available and not to add speed
+  tracking for this. Nothing tracks speed, so the header renders
+  `bulk <bar 16> done/total · ✗ N failed` and the queue bars render `NN%`
+  only.
+
+- **M4, a failed queue row shows its size, not the mock's `retry r`** — §5.3's
+  mock puts `retry r` where the size goes, but §3's prose fixes the row
+  content as "status symbol, title, size". The prose wins; the retry
+  affordance lives in the pinned hint (`r retry failed`) and the red reason
+  row under the failure.
+
+- **M4, queue-mode esc defers to the availability banner** — §4 rule 1 makes
+  the banner own esc in list and queue modes (M3's recorded semantics); with
+  the queue panel esc now meaning "back to list", the router skips its esc
+  handling while `availabilityStatus.state !== "available"` so one esc stops
+  the wait instead of also closing the panel. `v` still leaves the queue
+  during a wait.
+
+- **M4, queue-panel rows are grouped for scrolling** — the panel's content is
+  built as groups (an item plus its bar/reason lines, or fixed lines:
+  section headers, blanks, Saved to/Lists). The `queueCursor` window moves in
+  groups so a scroll never separates an item from its bar or failure reason;
+  it fills forward from the cursor first, then back, keeping the window full.
+  The builder (`queue-rows.ts`) is shared by the panel and the key router, so
+  the cursor's clamping and its x/d/space target cannot drift from what is
+  rendered.
+
+- **M4, pre-run queue section and direct rows** — before a run the Bulk
+  section renders the bare `Bulk download` title (no `0 of 0` summary) over
+  the selected entries with `●`. "Newest first" for direct downloads reads as
+  the reversed insertion order of `downloadProgressMap` keys (a key enters
+  when the download is queued); titles fall back to the entry id, a queue
+  row's title/size come from `bulkDownloadSelectedEntries` by MD5 and fall
+  back to the raw MD5 as §3 specifies.
+
+- **M4, harness `MODE=clibulk` for the §5.8 CLI capture** — the CLI path
+  enters via `renderTUI({startInCLIMode, initialLayout:
+  BULK_DOWNLOAD_LAYOUT})` + `startBulkDownloadInCLI`, which the harness
+  cannot reach through the interactive screen. clibulk seeds `CLIMode` and
+  the old layout, then calls the real `startBulkDownloadInCLI` with an inline
+  MD5 list against the fake download service (one `11…` MD5 fails, as in
+  bulkfail); it skips `fetchConfig` and the file read, which need the
+  network/filesystem. The run renders the unchanged old bulk screen, writes
+  the MD5 list files to the cwd and exits via `handleExit`. Documented here
+  rather than in `dev/README.md`, which is outside this ticket's file scope.

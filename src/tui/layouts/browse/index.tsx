@@ -69,11 +69,14 @@ export function BrowseLayout() {
 
   const overlayOpen = browseFocus === "help" || browseFocus === "quit";
 
-  // Footer hints by focus mode (spec §4): the queue row is M4's to enable and
-  // the search row M5's, so those modes keep the list hints for now.
+  // Footer hints by focus mode (spec §4): the search row stays M5's, so the
+  // search input's keys remain unwired for now.
   let hints = Label.FOOTER_LIST_NARROW;
   if (metrics.mode === "wide") {
     hints = Label.FOOTER_LIST_WIDE;
+  }
+  if (browseFocus === "queue") {
+    hints = Label.FOOTER_QUEUE;
   }
   if (browseFocus === "help") {
     hints = Label.FOOTER_HELP;

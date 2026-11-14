@@ -4,6 +4,7 @@ import { useBoundStore } from "../../store";
 import { unfinishedQueueCount } from "./queue-count";
 import { EntryDetail } from "./entry-detail";
 import type { DetailLayout } from "./entry-detail";
+import { QueuePanel } from "./queue-panel";
 
 interface Properties {
   width: number;
@@ -99,6 +100,7 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
         overflow="hidden"
       >
         {detailActive && <EntryDetail entry={entry} layout={detailLayout} width={width - 2} />}
+        {!detailActive && <QueuePanel width={width - 2} height={height - 2} />}
       </Box>
     </Box>
   );
