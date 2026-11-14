@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import figures from "figures";
 import { useBoundStore } from "../store";
-import { APP_VERSION } from "../../index";
+import { APP_VERSION } from "../../version";
 
 export function AppHeader() {
   const latestVersion = useBoundStore((state) => state.latestVersion);
