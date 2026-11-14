@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Text } from "ink";
 import figures from "figures";
+import { Label } from "../../../labels";
 import type { Entry } from "../../../api/models/entry";
 import type { RowStatus } from "./row-status";
 
@@ -39,6 +40,28 @@ export const fitCell = (text: string, width: number, alignment: "left" | "right"
     return fitted.padStart(width, " ");
   }
   return fitted.padEnd(width, " ");
+};
+
+// The dim column-header row above the entries (spec §3's column table); the
+// same widths and fit rules the rows below it use.
+export const headerLine = (columns: RowWidths): string => {
+  let line =
+    fitCell("", RESULT_CURSOR_WIDTH, "right") +
+    " " +
+    fitCell(Label.RESULT_COLUMN_NUMBER, RESULT_NUMBER_WIDTH, "right") +
+    " " +
+    fitCell(Label.RESULT_COLUMN_EXTENSION, RESULT_EXTENSION_WIDTH, "left") +
+    " " +
+    fitCell(Label.RESULT_COLUMN_TITLE, columns.title, "left");
+  if (columns.showAuthor) {
+    line += " " + fitCell(Label.RESULT_COLUMN_AUTHOR, columns.author, "left");
+  }
+  line +=
+    " " +
+    fitCell(Label.RESULT_COLUMN_SIZE, RESULT_SIZE_WIDTH, "right") +
+    " " +
+    fitCell(Label.RESULT_COLUMN_STATUS, RESULT_STATUS_WIDTH, "left");
+  return line;
 };
 
 interface Properties {

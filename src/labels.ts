@@ -93,6 +93,17 @@ export const Label = {
     ["ctrl+u", "clear"],
   ] as ReadonlyArray<readonly [string, string]>,
 
+  // Status header (spec §3): the live summary's words, the ` · ` separator
+  // between summary parts and the bulk-run variant's `bulk ` prefix (the
+  // trailing space is part of the rendered prefix).
+  STATUS_SUMMARY_DOWNLOADING: "downloading",
+  STATUS_SUMMARY_QUEUED: "queued",
+  STATUS_SUMMARY_IN_BULK: "in bulk",
+  STATUS_SUMMARY_DONE: "done",
+  STATUS_SUMMARY_FAILED: "failed",
+  STATUS_SUMMARY_SEPARATOR: " · ",
+  STATUS_BULK_RUN_PREFIX: "bulk ",
+
   // Warnings for the list-mode keys (spec §4).
   NO_MORE_RESULTS: "No more results",
   BULK_ALREADY_RUNNING: "Bulk download already running",

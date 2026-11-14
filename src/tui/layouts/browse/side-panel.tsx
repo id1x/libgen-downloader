@@ -6,6 +6,7 @@ import { EntryDetail } from "./entry-detail";
 import type { DetailLayout } from "./entry-detail";
 import { QueuePanel } from "./queue-panel";
 import { SearchHistory } from "./search-history";
+import { borderTopTail } from "./panel-border";
 
 interface Properties {
   width: number;
@@ -56,14 +57,11 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
   const detailActive = sidePanel === "detail";
 
   // Top border with the `Detail │ Queue N` tabs (spec §3): the active tab
-  // bold, the other dim, and a right-aligned dim `v` hint.
-  const tabsWidth =
-    Label.SIDE_PANEL_TAB_DETAIL.length + 3 + queueLabel.length; // "Detail" + " │ " + "Queue N"
-  const tail = ` ${Label.SIDE_PANEL_TOGGLE_HINT} ─╮`;
-  let dashes = width - (3 + tabsWidth + 1 + tail.length); // "╭─ ", tabs, " ", tail
-  if (dashes < 1) {
-    dashes = 1;
-  }
+  // bold, the other dim, and a right-aligned dim `v` hint. The border tail
+  // arithmetic is shared with the other panels (panel-border.ts); the tabs
+  // string is the border line's "title".
+  const tabs = `${Label.SIDE_PANEL_TAB_DETAIL} │ ${queueLabel}`;
+  const tail = borderTopTail(width, tabs, Label.SIDE_PANEL_TOGGLE_HINT);
 
   let detailColor: string | undefined = "gray";
   let detailBold = false;
@@ -82,22 +80,14 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
   if (searchActive) {
     // The Search panel (spec §5.4): a plain `Search` title, no tabs and no
     // `v` hint — the history list takes the panel in every layout mode.
-    const searchPrefixLength = 3 + Label.SEARCH_PANEL_TITLE.length + 1; // "╭─ <title> "
-    let searchDashes = width - searchPrefixLength - 2; // "─╮"
-    if (searchDashes < 1) {
-      searchDashes = 1;
-    }
+    const searchTail = borderTopTail(width, Label.SEARCH_PANEL_TITLE);
 
     return (
       <Box flexDirection="column" width={width}>
         <Text wrap="truncate-end">
           <Text color="gray">╭─ </Text>
           <Text>{Label.SEARCH_PANEL_TITLE}</Text>
-          <Text color="gray">
-            {" "}
-            {"─".repeat(searchDashes)}
-            ─╮
-          </Text>
+          <Text color="gray"> {searchTail}</Text>
         </Text>
         <Box
           borderStyle="round"
@@ -127,7 +117,6 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
         </Text>
         <Text color="gray">
           {" "}
-          {"─".repeat(dashes)}
           {tail}
         </Text>
       </Text>

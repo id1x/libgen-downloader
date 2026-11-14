@@ -1,23 +1,32 @@
 import { Text } from "ink";
 import { APP_VERSION } from "../../../version";
 import { DownloadStatus } from "../../../download-statuses";
+import { Label } from "../../../labels";
 import { useBoundStore } from "../../store";
 import { useStdoutDimensions } from "../../hooks/use-stdout-dimensions";
 import { WIDE_MIN_COLUMNS } from "./layout-metrics";
 import { ProgressBar } from "../../components/progress-bar";
 import { isCompleted, isFailed } from "../../store/utils/bulk-queue";
+import { BULK_SELECTED_SYMBOL, STATUS_SYMBOLS } from "./status-symbol";
+import type { StatusSymbol } from "./status-symbol";
 
-interface SummarySegment {
-  symbol: string;
+interface SummarySegment extends StatusSymbol {
   count: number;
   word: string;
-  color: string;
 }
 
 // Bulk-run header variant (spec §3): `bulk <bar 16> done/total · ✗ N failed`.
 const BULK_BAR_WIDTH = 16;
-const BULK_PREFIX_WIDTH = "bulk ".length;
 const BULK_BAR_RESERVE = 1; // space between the bar and done/total
+
+// Everything between queued and running reads as "queued" in the summary.
+const QUEUED_STATUSES = new Set<DownloadStatus>([
+  DownloadStatus.IN_QUEUE,
+  DownloadStatus.CONNECTING_TO_LIBGEN,
+  DownloadStatus.PROCESSING,
+  DownloadStatus.FETCHING_MD5,
+  DownloadStatus.WAITING_FOR_LIBGEN,
+]);
 
 const mirrorHost = (baseURL: string | undefined): string => {
   if (!baseURL) {
@@ -45,47 +54,28 @@ export function StatusHeader() {
 
   const bulkRunActive = bulkDownloadQueue.length > 0 && !isBulkDownloadComplete;
 
-  let downloading = 0;
-  let queued = 0;
-  let done = 0;
-  let failed = 0;
-  for (const progress of Object.values(downloadProgressMap)) {
-    switch (progress.status) {
-      case DownloadStatus.DOWNLOADING: {
-        downloading += 1;
-        break;
-      }
-      case DownloadStatus.DOWNLOADED: {
-        done += 1;
-        break;
-      }
-      case DownloadStatus.FAILED: {
-        failed += 1;
-        break;
-      }
-      // Everything between queued and running reads as "queued".
-      case DownloadStatus.IN_QUEUE:
-      case DownloadStatus.CONNECTING_TO_LIBGEN:
-      case DownloadStatus.PROCESSING:
-      case DownloadStatus.FETCHING_MD5:
-      case DownloadStatus.WAITING_FOR_LIBGEN: {
-        queued += 1;
-        break;
-      }
-    }
-  }
+  // Live summary counts (spec §3). Everything between queued and running
+  // reads as "queued"; the settled outcomes count on their own.
+  const statuses = Object.values(downloadProgressMap).map((progress) => progress.status);
+  const downloading = statuses.filter((status) => status === DownloadStatus.DOWNLOADING).length;
+  const queued = statuses.filter((status) => QUEUED_STATUSES.has(status)).length;
+  const done = statuses.filter((status) => status === DownloadStatus.DOWNLOADED).length;
+  const failed = statuses.filter((status) => status === DownloadStatus.FAILED).length;
 
+  // The bulk segment carries the selection glyph (not a DownloadStatus).
+  const summarySegment = (status: DownloadStatus, count: number, word: string): SummarySegment => {
+    return { ...STATUS_SYMBOLS[status], count, word };
+  };
   const segments: SummarySegment[] = [
-    { symbol: "↓", count: downloading, word: "downloading", color: "cyan" },
-    { symbol: "⋯", count: queued, word: "queued", color: "gray" },
+    summarySegment(DownloadStatus.DOWNLOADING, downloading, Label.STATUS_SUMMARY_DOWNLOADING),
+    summarySegment(DownloadStatus.IN_QUEUE, queued, Label.STATUS_SUMMARY_QUEUED),
     {
-      symbol: "●",
+      ...BULK_SELECTED_SYMBOL,
       count: Object.keys(bulkDownloadSelectedEntries).length,
-      word: "in bulk",
-      color: "yellow",
+      word: Label.STATUS_SUMMARY_IN_BULK,
     },
-    { symbol: "✓", count: done, word: "done", color: "green" },
-    { symbol: "✗", count: failed, word: "failed", color: "red" },
+    summarySegment(DownloadStatus.DOWNLOADED, done, Label.STATUS_SUMMARY_DONE),
+    summarySegment(DownloadStatus.FAILED, failed, Label.STATUS_SUMMARY_FAILED),
   ];
   const activeSegments = segments.filter((segment) => segment.count > 0);
   const isWide = terminalColumns >= WIDE_MIN_COLUMNS;
@@ -108,13 +98,20 @@ export function StatusHeader() {
 
   // Right-part length per variant: the normal live summary, or the bulk-run
   // summary `bulk <bar 16> done/total` plus ` · ✗ N failed` when items failed.
+  const failedSymbol = STATUS_SYMBOLS[DownloadStatus.FAILED];
   const bulkDone = bulkDownloadQueue.filter((item) => isCompleted(item)).length;
   const bulkFailed = bulkDownloadQueue.filter((item) => isFailed(item)).length;
   const bulkRatioWidth =
     String(bulkDone).length + 1 + String(bulkDownloadQueue.length).length;
   const bulkFailedWidth =
-    3 + 1 + 1 + String(bulkFailed).length + 1 + "failed".length; // " · ✗ N failed"
-  let bulkSummaryLength = BULK_PREFIX_WIDTH + BULK_BAR_WIDTH + BULK_BAR_RESERVE + bulkRatioWidth;
+    Label.STATUS_SUMMARY_SEPARATOR.length +
+    1 +
+    1 +
+    String(bulkFailed).length +
+    1 +
+    Label.STATUS_SUMMARY_FAILED.length; // " · ✗ N failed"
+  let bulkSummaryLength =
+    Label.STATUS_BULK_RUN_PREFIX.length + BULK_BAR_WIDTH + BULK_BAR_RESERVE + bulkRatioWidth;
   if (bulkFailed > 0) {
     bulkSummaryLength += bulkFailedWidth;
   }
@@ -125,7 +122,7 @@ export function StatusHeader() {
   } else {
     for (const [index, segment] of activeSegments.entries()) {
       if (index > 0) {
-        summaryLength += 3; // " · "
+        summaryLength += Label.STATUS_SUMMARY_SEPARATOR.length;
       }
       summaryLength += segmentWidth(segment);
     }
@@ -150,13 +147,15 @@ export function StatusHeader() {
       <Text>{" ".repeat(pad)}</Text>
       {bulkRunActive && (
         <>
-          <Text color="gray">bulk </Text>
+          <Text color="gray">{Label.STATUS_BULK_RUN_PREFIX}</Text>
           <ProgressBar ratio={bulkDone / bulkDownloadQueue.length} width={BULK_BAR_WIDTH} />
           <Text> {bulkDone}/{bulkDownloadQueue.length}</Text>
           {bulkFailed > 0 && (
             <>
-              <Text color="gray"> · </Text>
-              <Text color="red">✗ {bulkFailed} failed</Text>
+              <Text color="gray">{Label.STATUS_SUMMARY_SEPARATOR}</Text>
+              <Text color={failedSymbol.color}>
+                {failedSymbol.symbol} {bulkFailed} {Label.STATUS_SUMMARY_FAILED}
+              </Text>
             </>
           )}
         </>
@@ -164,7 +163,7 @@ export function StatusHeader() {
       {!bulkRunActive &&
         activeSegments.map((segment, index) => (
           <Text key={segment.symbol}>
-            {index > 0 && <Text color="gray"> · </Text>}
+            {index > 0 && <Text color="gray">{Label.STATUS_SUMMARY_SEPARATOR}</Text>}
             <Text color={segment.color}>
               {segment.symbol}
               {isWide && " "}

@@ -2,6 +2,7 @@ import { Box, Text } from "ink";
 import { Label } from "../../../labels";
 import { useBoundStore } from "../../store";
 import { EntryDetail } from "./entry-detail";
+import { borderTopTail } from "./panel-border";
 
 interface Properties {
   width: number;
@@ -9,20 +10,11 @@ interface Properties {
   height: number;
 }
 
-// The top border line is drawn by hand so the `Detail  N/count` title can sit
-// inside it, the same way ResultsPanel draws its border.
-const borderTopTail = (width: number, title: string): string => {
-  const prefixLength = 3 + title.length + 1; // "╭─ <title> "
-  let dashes = width - prefixLength - 2; // "─╮"
-  if (dashes < 1) {
-    dashes = 1;
-  }
-  return `${"─".repeat(dashes)}─╮`;
-};
-
 // Full-screen detail (spec §5.7): the wide Detail panel's content at full
 // width as one bordered panel titled `Detail  N/25`. EntryDetail
-// layout="full" wraps long values instead of truncating them.
+// layout="full" wraps long values instead of truncating them. The top border
+// line is drawn by hand so the title can sit inside it, the same way
+// ResultsPanel draws its border (panel-border.ts).
 export function FullDetailPanel({ width, height }: Properties) {
   const entries = useBoundStore((state) => state.entries);
   const listItemsCursor = useBoundStore((state) => state.listItemsCursor);

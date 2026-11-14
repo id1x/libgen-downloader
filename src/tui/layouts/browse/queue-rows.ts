@@ -2,105 +2,23 @@ import objectHash from "object-hash";
 import { Label } from "../../../labels";
 import { DownloadStatus } from "../../../download-statuses";
 import type { Entry } from "../../../api/models/entry";
-import type { IDownloadProgress } from "../../store/download-queue";
-import type { IBulkDownloadQueueItem } from "../../store/bulk-download-queue";
 import { isCompleted, isFailed } from "../../store/utils/bulk-queue";
-import { downloadPercent, SPINNER_SYMBOL, type RowStatusMirrorAdapter } from "./row-status";
+import { downloadPercent } from "./row-status";
+import { BULK_SELECTED_SYMBOL } from "./status-symbol";
+import { itemLines } from "./queue-model";
+import type {
+  QueueActionRow,
+  QueueGroup,
+  QueueLine,
+  QueueModel,
+  QueueModelContext,
+} from "./queue-model";
 
-// --- data model -------------------------------------------------------------
-
-// One rendered line of the Queue panel (spec §3's queue sections). Bars and
-// failure reasons are separate lines attached to the item above them.
-export type QueueLine =
-  | {
-      kind: "section";
-      title: string;
-      // `done of total done · N failed`; absent before a run starts.
-      summary: { done: number; total: number; failed: number } | undefined;
-    }
-  | { kind: "bar"; ratio: number; percent: number }
-  | { kind: "item"; symbol: string; color: string | undefined; title: string; size: string }
-  | { kind: "reason"; text: string }
-  | { kind: "saved"; path: string }
-  | { kind: "list-file"; name: string }
-  | { kind: "blank" };
-
-// A scroll unit: an item row with its attached bar/reason lines, or a fixed
-// line (section header, blank, saved-to). Groups render all-or-nothing so a
-// scrolling window never separates an item from its bar or reason.
-export interface QueueGroup {
-  lines: QueueLine[];
-  // Actionable-row index this group belongs to; -1 for fixed groups.
-  anchor: number;
-}
-
-// What x/d/space act on for one actionable row (spec §4, queue mode).
-export interface QueueActionRow {
-  type: "bulk" | "direct";
-  md5?: string;
-  entryId?: string;
-  // The entry the row maps to, when it maps to a result.
-  entry: Entry | undefined;
-  // Whether the entry is currently in the bulk selection (drives `x`).
-  selected: boolean;
-}
-
-export interface QueueModel {
-  groups: QueueGroup[];
-  actions: QueueActionRow[];
-}
-
-export interface QueueModelContext {
-  entries: Entry[];
-  mirrorAdapter: RowStatusMirrorAdapter | undefined;
-  bulkDownloadSelectedEntries: Record<string, Entry>;
-  bulkDownloadQueue: IBulkDownloadQueueItem[];
-  bulkFailureReasons: Record<string, string>;
-  downloadProgressMap: Record<string, IDownloadProgress>;
-  // `process.cwd()` at render time; a parameter keeps the model pure.
-  downloadDirectory: string;
-  createdMD5ListFileName: string;
-  createdFailedMD5ListFileName: string;
-}
-
-// Status symbol for a queue row (spec §3: "the same symbols" as the row
-// status table, keyed on the queue item's own status).
-export const queueItemStatus = (
-  status: DownloadStatus
-): { symbol: string; color: string | undefined } => {
-  switch (status) {
-    case DownloadStatus.DOWNLOADING: {
-      return { symbol: "↓", color: "cyan" };
-    }
-    case DownloadStatus.DOWNLOADED: {
-      return { symbol: "✓", color: "green" };
-    }
-    case DownloadStatus.FAILED: {
-      return { symbol: "✗", color: "red" };
-    }
-    case DownloadStatus.WAITING_FOR_LIBGEN: {
-      return { symbol: "…", color: "magenta" };
-    }
-    case DownloadStatus.IN_QUEUE: {
-      return { symbol: "⋯", color: "gray" };
-    }
-    default: {
-      // CONNECTING/PROCESSING/FETCHING (and IDLE) work without a byte count.
-      return { symbol: SPINNER_SYMBOL, color: "cyan" };
-    }
-  }
-};
-
-const itemBarLine = (progress: number | undefined, total: number): QueueLine | undefined => {
-  if (!total || total <= 0) {
-    return undefined;
-  }
-  return {
-    kind: "bar",
-    ratio: (progress || 0) / total,
-    percent: downloadPercent(progress, total),
-  };
-};
+// The sections' building blocks moved with their types (queue-model.ts) and
+// the scroll window with its own concern (queue-scroll.ts); the names stay
+// importable from here so the panel and the key router keep one import path.
+export { visibleQueueGroups } from "./queue-scroll";
+export type { QueueLine, QueueModel } from "./queue-model";
 
 // The Queue panel's content (spec §3 + §5.3): sections in order — Bulk
 // download (summary, overall bar, per-item rows from bulkDownloadQueue, or
@@ -142,32 +60,20 @@ export const buildQueueModel = (context: QueueModelContext): QueueModel => {
   if (queue.length > 0) {
     const done = queue.filter((item) => isCompleted(item)).length;
     const failed = queue.filter((item) => isFailed(item)).length;
-    emitSection(
-      Label.QUEUE_SECTION_BULK,
-      { done, total: queue.length, failed }
-    );
+    emitSection(Label.QUEUE_SECTION_BULK, { done, total: queue.length, failed });
     pushFixed([
       { kind: "bar", ratio: done / queue.length, percent: downloadPercent(done, queue.length) },
     ]);
 
     for (const item of queue) {
-      const { symbol, color } = queueItemStatus(item.status);
       const entry = selectedByMD5.get(item.md5);
-      const lines: QueueLine[] = [
-        {
-          kind: "item",
-          symbol,
-          color,
-          title: entry?.title ?? item.md5,
-          size: entry?.size ?? "",
-        },
-      ];
-      if (item.status === DownloadStatus.DOWNLOADING) {
-        const bar = itemBarLine(item.progress, item.total);
-        if (bar) {
-          lines.push(bar);
-        }
-      }
+      const lines = itemLines(
+        item.status,
+        entry?.title ?? item.md5,
+        entry?.size ?? "",
+        item.progress,
+        item.total
+      );
       if (item.status === DownloadStatus.FAILED && context.bulkFailureReasons[item.md5]) {
         lines.push({ kind: "reason", text: context.bulkFailureReasons[item.md5] });
       }
@@ -184,7 +90,15 @@ export const buildQueueModel = (context: QueueModelContext): QueueModel => {
     emitSection(Label.QUEUE_SECTION_BULK);
     for (const entry of Object.values(context.bulkDownloadSelectedEntries)) {
       pushAction(
-        [{ kind: "item", symbol: "●", color: "yellow", title: entry.title, size: entry.size }],
+        [
+          {
+            kind: "item",
+            symbol: BULK_SELECTED_SYMBOL.symbol,
+            color: BULK_SELECTED_SYMBOL.color,
+            title: entry.title,
+            size: entry.size,
+          },
+        ],
         {
           type: "bulk",
           md5: context.mirrorAdapter?.getEntryMD5(entry),
@@ -203,23 +117,14 @@ export const buildQueueModel = (context: QueueModelContext): QueueModel => {
     emitSection(Label.QUEUE_SECTION_DIRECT);
     const entryById = new Map(context.entries.map((entry) => [entry.id, entry]));
     for (const [entryId, progress] of progressRecords.toReversed()) {
-      const { symbol, color } = queueItemStatus(progress.status);
       const entry = entryById.get(entryId);
-      const lines: QueueLine[] = [
-        {
-          kind: "item",
-          symbol,
-          color,
-          title: entry?.title ?? entryId,
-          size: entry?.size ?? "",
-        },
-      ];
-      if (progress.status === DownloadStatus.DOWNLOADING) {
-        const bar = itemBarLine(progress.progress, progress.total);
-        if (bar) {
-          lines.push(bar);
-        }
-      }
+      const lines = itemLines(
+        progress.status,
+        entry?.title ?? entryId,
+        entry?.size ?? "",
+        progress.progress,
+        progress.total
+      );
       const action: QueueActionRow = {
         type: "direct",
         entryId,
@@ -247,38 +152,4 @@ export const buildQueueModel = (context: QueueModelContext): QueueModel => {
   }
 
   return { groups, actions };
-};
-
-// Scroll window over the groups for a cursor over the actionable rows (spec
-// §5.3: "the Queue panel scrolls with queueCursor"). Keeps the cursor's group
-// visible, fills forward first, then back so the window stays full.
-export const visibleQueueGroups = (
-  groups: QueueGroup[],
-  queueCursor: number,
-  viewport: number
-): QueueGroup[] => {
-  if (groups.length === 0 || viewport < 1) {
-    return [];
-  }
-
-  const actionableCount = groups.filter((group) => group.anchor >= 0).length;
-  const cursor = Math.min(Math.max(queueCursor, 0), Math.max(actionableCount - 1, 0));
-  let index = groups.findIndex((group) => group.anchor === cursor);
-  if (index < 0) {
-    index = 0;
-  }
-
-  let start = index;
-  let end = index;
-  let used = groups[index].lines.length;
-  while (end + 1 < groups.length && used + groups[end + 1].lines.length <= viewport) {
-    end += 1;
-    used += groups[end].lines.length;
-  }
-  while (start - 1 >= 0 && used + groups[start - 1].lines.length <= viewport) {
-    start -= 1;
-    used += groups[start].lines.length;
-  }
-
-  return groups.slice(start, end + 1);
 };

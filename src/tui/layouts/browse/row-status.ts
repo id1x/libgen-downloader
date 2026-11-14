@@ -2,6 +2,7 @@ import { DownloadStatus } from "../../../download-statuses";
 import type { Entry } from "../../../api/models/entry";
 import type { IDownloadProgress } from "../../store/download-queue";
 import type { IBulkDownloadQueueItem } from "../../store/bulk-download-queue";
+import { BULK_SELECTED_SYMBOL, STATUS_SYMBOLS } from "./status-symbol";
 
 // Statuses that are actively working but have no byte progress yet (spec §3
 // row table, "spinner" row).
@@ -10,11 +11,6 @@ const SPINNER_STATUSES = new Set<DownloadStatus>([
   DownloadStatus.PROCESSING,
   DownloadStatus.FETCHING_MD5,
 ]);
-
-// Static spinner frame. A live spinner would advance only when the row
-// re-renders, and rows are memoised against the status (spec §8.4 key
-// repeat), so the frame character is drawn directly.
-export const SPINNER_SYMBOL = "⠋";
 
 export type RowStatusKind =
   | "progress"
@@ -67,8 +63,11 @@ const blankStatus = (): RowStatus => {
   return { symbol: "", color: undefined, kind: "none" };
 };
 
+// The fixed glyphs come from the shared status map (spec §3's table);
+// DOWNLOADING is the one status a row renders differently — the live percent
+// — so it only borrows the map's colour.
 const doneStatus = (): RowStatus => {
-  return { symbol: "✓", color: "green", kind: "done" };
+  return { ...STATUS_SYMBOLS[DownloadStatus.DOWNLOADED], kind: "done" };
 };
 
 // Row status label per spec §3's table, highest priority first: direct
@@ -82,19 +81,23 @@ export const rowStatus = (entry: Entry, context: RowStatusContext): RowStatus =>
   if (progress) {
     if (progress.status === DownloadStatus.DOWNLOADING) {
       const percent = downloadPercent(progress.progress, progress.total);
-      return { symbol: `${percent}%`, color: "cyan", kind: "progress" };
+      return {
+        symbol: `${percent}%`,
+        color: STATUS_SYMBOLS[DownloadStatus.DOWNLOADING].color,
+        kind: "progress",
+      };
     }
     if (SPINNER_STATUSES.has(progress.status)) {
-      return { symbol: SPINNER_SYMBOL, color: "cyan", kind: "spinner" };
+      return { ...STATUS_SYMBOLS[progress.status], kind: "spinner" };
     }
     if (progress.status === DownloadStatus.WAITING_FOR_LIBGEN) {
-      return { symbol: "…", color: "magenta", kind: "waiting" };
+      return { ...STATUS_SYMBOLS[progress.status], kind: "waiting" };
     }
     if (progress.status === DownloadStatus.IN_QUEUE) {
-      return { symbol: "⋯", color: "gray", kind: "queued" };
+      return { ...STATUS_SYMBOLS[progress.status], kind: "queued" };
     }
     if (progress.status === DownloadStatus.FAILED) {
-      return { symbol: "✗", color: "red", kind: "failed" };
+      return { ...STATUS_SYMBOLS[progress.status], kind: "failed" };
     }
     if (progress.status === DownloadStatus.DOWNLOADED) {
       return doneStatus();
@@ -107,7 +110,7 @@ export const rowStatus = (entry: Entry, context: RowStatusContext): RowStatus =>
     if (outcome && outcome.status === DownloadStatus.DOWNLOADED) {
       return doneStatus();
     }
-    return { symbol: "●", color: "yellow", kind: "bulk" };
+    return { ...BULK_SELECTED_SYMBOL, kind: "bulk" };
   }
 
   return blankStatus();

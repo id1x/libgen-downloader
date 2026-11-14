@@ -9,15 +9,8 @@ import { MirrorFailover } from "../../components/mirror-failover";
 import type { ResultColumns } from "./layout-metrics";
 import type { RowStatus } from "./row-status";
 import { rowStatus } from "./row-status";
-import {
-  ResultRow,
-  RESULT_CURSOR_WIDTH,
-  RESULT_EXTENSION_WIDTH,
-  RESULT_NUMBER_WIDTH,
-  RESULT_SIZE_WIDTH,
-  RESULT_STATUS_WIDTH,
-  fitCell,
-} from "./result-row";
+import { ResultRow, headerLine } from "./result-row";
+import { borderTopTail } from "./panel-border";
 
 interface Properties {
   width: number;
@@ -31,18 +24,7 @@ interface Properties {
 
 // The results panel draws its own top border line so the title and the
 // position marker can sit inside it; the box below omits its top border.
-const borderTopTail = (width: number, marker: string): string => {
-  let tail = "─╮";
-  if (marker.length > 0) {
-    tail = ` ${marker} ─╮`;
-  }
-  const prefixLength = 3 + Label.RESULTS_PANEL_TITLE.length + 1; // "╭─ <title> "
-  let dashes = width - prefixLength - tail.length;
-  if (dashes < 1) {
-    dashes = 1;
-  }
-  return `${"─".repeat(dashes)}${tail}`;
-};
+// The tail arithmetic is shared with the other panels (panel-border.ts).
 
 // Scroll window over the entries: keep the cursor at least 2 rows from the
 // edges of the window when possible, clamped so the window always fills.
@@ -64,26 +46,6 @@ const visibleWindowStart = (cursor: number, count: number, viewport: number): nu
     start = maxStart;
   }
   return start;
-};
-
-const headerLine = (columns: ResultColumns): string => {
-  let line =
-    fitCell("", RESULT_CURSOR_WIDTH, "right") +
-    " " +
-    fitCell(Label.RESULT_COLUMN_NUMBER, RESULT_NUMBER_WIDTH, "right") +
-    " " +
-    fitCell(Label.RESULT_COLUMN_EXTENSION, RESULT_EXTENSION_WIDTH, "left") +
-    " " +
-    fitCell(Label.RESULT_COLUMN_TITLE, columns.title, "left");
-  if (columns.showAuthor) {
-    line += " " + fitCell(Label.RESULT_COLUMN_AUTHOR, columns.author, "left");
-  }
-  line +=
-    " " +
-    fitCell(Label.RESULT_COLUMN_SIZE, RESULT_SIZE_WIDTH, "right") +
-    " " +
-    fitCell(Label.RESULT_COLUMN_STATUS, RESULT_STATUS_WIDTH, "left");
-  return line;
 };
 
 export function ResultsPanel({ width, height, columns, dimmed }: Properties) {
@@ -126,7 +88,7 @@ export function ResultsPanel({ width, height, columns, dimmed }: Properties) {
       <Text wrap="truncate-end">
         <Text color="gray">╭─ </Text>
         <Text color={titleColor}>{Label.RESULTS_PANEL_TITLE}</Text>
-        <Text color="gray"> {borderTopTail(width, marker)}</Text>
+        <Text color="gray"> {borderTopTail(width, Label.RESULTS_PANEL_TITLE, marker)}</Text>
       </Text>
       <Box
         borderStyle="round"

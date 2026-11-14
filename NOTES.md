@@ -340,3 +340,82 @@ code or left a case unclear. Smallest-change choices, newest last.
   row truncation, the full-detail wrap and the `—` placeholder in one capture.
   Documented here rather than in `dev/README.md`, which is outside this
   ticket's file scope.
+
+## Review-fix pass (branch `fix/review-findings`)
+
+- **List mode's `r`** — §4's list table row is now wired: `r` in list mode
+  calls the same guarded action queue mode's `r` uses (`isBulkDownloadComplete &&
+  failedBulkDownloadItemCount > 0`, else no-op), so the help overlay's
+  "Global: r retry failed downloads" row is true in both modes.
+
+- **Priority rule 4 in `fullDetail`, and what "only q, ? work" means there** —
+  the isLoading gate previously sat in the `list` and `queue` branches only;
+  it now covers `fullDetail` too (help/quit/search stay exempt per the M3
+  note). fullDetail binds neither `q` nor `?` of its own, so during a load the
+  gate dispatches them straight to their global meanings — `q` → `requestQuit`,
+  `?` → the help overlay — exactly what list/queue's handlers do with the same
+  keys. Rule 4 says those keys *work* while `isLoading`, so "exempt from the
+  gate but dead" would not satisfy it; outside a load fullDetail's keymap is
+  unchanged (esc/enter/space/tab/d/↑↓ only).
+
+- **Key-router split** — `use-browse-keys.ts` (550 lines) is now the router
+  proper: store subscriptions, the per-keypress `KeyActions` object and the
+  `useInput` switch with the loading gates. Siblings: `key-actions.ts` (the
+  `KeyActions` contract), `list-keys.ts` (`handleListKeys` +
+  `handleFullDetailKeys`, the two modes that act on the cursor entry),
+  `queue-keys.ts` (`handleQueueKeys` + the queue/cursor model helpers and the
+  queue/search-adjacent actions they need: `enterQueue`, `leaveQueue`,
+  `moveQueueCursorBy`, `removeBulkUnderCursor`, `retryFailedBulk`,
+  `actOnCursorRow`), `overlay-keys.ts` (`handleSearchKeys`/`handleHelpKeys`/
+  `handleQuitKeys` plus the search actions). The router stays at 204 lines —
+  under the review's "well under 300" bar — because the wiring closures read
+  render-time snapshots (`currentPage`, `nextPageStatus`, `searchValue`,
+  `bulkDownloadSelectedEntries`) that a deeper factory would have to thread
+  through a deps interface for no behavioural gain.
+
+- **Delegation wrappers removed** — `startBulkDownload`,
+  `searchHistoryUp`/`Down` (now the store's `searchHistoryPrevious`/`Next`
+  directly) and `downloadEntry` are wired as plain store-action references;
+  wrappers remain only where they add something (`prevPage`'s page-1 guard,
+  `openHelp`'s overlay argument, `actOnCursorEntry`'s snapshot-bound toggle).
+
+- **Shared status map** — `status-symbol.ts` holds the §3 glyph table
+  (`STATUS_SYMBOLS`, one entry per `DownloadStatus`) plus `SPINNER_SYMBOL`
+  (moved here from row-status.ts) and `BULK_SELECTED_SYMBOL` (● yellow —
+  membership, not a run state). `rowStatus` consumes it for every fixed glyph
+  (DOWNLOADING stays special: the row renders the live percent and borrows
+  only the colour), `queue-rows.ts`'s `queueItemStatus` switch is gone — the
+  two item-line call sites read the map directly, byte-identical output — and
+  the status header's segments and the bulk-run `✗ N failed` tail are built
+  from it.
+
+- **Header labels** — the status header's user-facing strings moved to
+  `labels.ts`: `STATUS_SUMMARY_{DOWNLOADING,QUEUED,IN_BULK,DONE,FAILED}`,
+  `STATUS_SUMMARY_SEPARATOR` (` · `) and `STATUS_BULK_RUN_PREFIX` (`bulk `,
+  trailing space included so the width math derives from the label).
+
+- **Shared border arithmetic** — `panel-border.ts` exports `borderTopTail`
+  (dashes + `─╮`, optional ` <marker> ─╮` when a marker sits in the line);
+  results-panel, full-detail-panel and side-panel (both its tab and Search
+  variants) consume it. side-panel's tabs row renders exactly as before — the
+  `Detail │ Queue N` tabs string is only used for the width math.
+
+- **queue-rows split** — types (`QueueLine`, `QueueGroup`, `QueueActionRow`,
+  `QueueModel`, `QueueModelContext`) and the item-line builder (`itemLines`,
+  shared by the bulk and direct sections) live in `queue-model.ts`, the scroll
+  window in `queue-scroll.ts`; `queue-rows.ts` keeps `buildQueueModel` and
+  re-exports `visibleQueueGroups`/`QueueLine`/`QueueModel` so `queue-panel.tsx`
+  and the router keep their one-line imports.
+
+- **`headerLine` moved to `result-row.tsx`** — beyond the letter of the
+  findings, driven by the ≤~160-lines bar: the column-header row is built from
+  the same widths and `fitCell` rules as the rows, so it belongs beside
+  `ResultRow`. Pure move, output unchanged (harness byte-compare).
+
+- **New tests** — `test/status-symbol.test.ts` pins the shared glyph table
+  (§3 authority), `test/queue-keys.test.ts` pins the moved queue helpers'
+  guards (retry's settled+failed condition, `x`'s before-a-run-only rule,
+  cursor clamping, space/d acting on the mapped entry), and
+  `test/list-keys.test.ts` pins list-mode `r` → retry, the exact-case `R`
+  no-op and fullDetail's esc/enter/d behaviour. The row-status, queue-count
+  and layout-metrics suites pass unchanged.
