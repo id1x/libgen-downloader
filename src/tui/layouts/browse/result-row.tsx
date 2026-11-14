@@ -50,9 +50,12 @@ interface Properties {
   // row-status.ts.
   status: RowStatus;
   widths: RowWidths;
+  // Search focus dims the whole results panel (spec §5.4): every cell gray,
+  // no status labels.
+  dimmed?: boolean;
 }
 
-const ResultRowComponent = ({ entry, number, isCursor, status, widths }: Properties) => {
+const ResultRowComponent = ({ entry, number, isCursor, status, widths, dimmed }: Properties) => {
   let background: string | undefined;
   if (isCursor) {
     background = CURSOR_BACKGROUND;
@@ -68,9 +71,17 @@ const ResultRowComponent = ({ entry, number, isCursor, status, widths }: Propert
     titleColor = "white";
   }
 
+  let cursorColor = "cyan";
+  let extensionColor = "green";
+  if (dimmed) {
+    cursorColor = "gray";
+    extensionColor = "gray";
+    titleColor = "gray";
+  }
+
   return (
     <Text backgroundColor={background}>
-      <Text backgroundColor={background} color="cyan" bold={isCursor}>
+      <Text backgroundColor={background} color={cursorColor} bold={!dimmed && isCursor}>
         {fitCell(cursorCell, RESULT_CURSOR_WIDTH, "right")}
       </Text>
       <Text backgroundColor={background}> </Text>
@@ -78,11 +89,11 @@ const ResultRowComponent = ({ entry, number, isCursor, status, widths }: Propert
         {fitCell(String(number), RESULT_NUMBER_WIDTH, "right")}
       </Text>
       <Text backgroundColor={background}> </Text>
-      <Text backgroundColor={background} color="green" bold={true}>
+      <Text backgroundColor={background} color={extensionColor} bold={!dimmed}>
         {fitCell(entry.extension, RESULT_EXTENSION_WIDTH, "left")}
       </Text>
       <Text backgroundColor={background}> </Text>
-      <Text backgroundColor={background} color={titleColor} bold={isCursor}>
+      <Text backgroundColor={background} color={titleColor} bold={!dimmed && isCursor}>
         {fitCell(entry.title, widths.title, "left")}
       </Text>
       {widths.showAuthor && (
@@ -118,6 +129,7 @@ export const ResultRow = memo(
     previous.status.symbol === next.status.symbol &&
     previous.status.color === next.status.color &&
     previous.status.kind === next.status.kind &&
+    previous.dimmed === next.dimmed &&
     previous.widths.title === next.widths.title &&
     previous.widths.author === next.widths.author &&
     previous.widths.showAuthor === next.widths.showAuthor

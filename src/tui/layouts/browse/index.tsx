@@ -69,8 +69,11 @@ export function BrowseLayout() {
 
   const overlayOpen = browseFocus === "help" || browseFocus === "quit";
 
-  // Footer hints by focus mode (spec §4): the search row stays M5's, so the
-  // search input's keys remain unwired for now.
+  // Search focus dims the results panel (spec §5.4); the search line shows
+  // the live input instead.
+  const searchActive = browseFocus === "search";
+
+  // Footer hints by focus mode (spec §4).
   let hints = Label.FOOTER_LIST_NARROW;
   if (metrics.mode === "wide") {
     hints = Label.FOOTER_LIST_WIDE;
@@ -86,6 +89,9 @@ export function BrowseLayout() {
   }
   if (browseFocus === "fullDetail") {
     hints = Label.FOOTER_FULL_DETAIL;
+  }
+  if (searchActive) {
+    hints = Label.FOOTER_SEARCH;
   }
 
   let detailLayout: "wide" | "stacked" = "stacked";
@@ -143,6 +149,7 @@ export function BrowseLayout() {
           width={metrics.resultsWidth}
           height={metrics.listHeight}
           columns={metrics.columns}
+          dimmed={searchActive}
         />
         <SidePanel
           width={metrics.sideWidth}

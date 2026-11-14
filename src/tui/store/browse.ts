@@ -19,7 +19,11 @@ export interface IBrowseState {
   closeOverlay: () => void;
   toggleSidePanel: () => void;
   setQueueCursor: (queueCursor: number) => void;
+  setSearchDraft: (searchDraft: string) => void;
   pushSearchHistory: (query: string) => void;
+  searchHistoryPrevious: () => void;
+  searchHistoryNext: () => void;
+  submitSearchFromBrowse: () => Promise<void>;
   requestQuit: () => void;
 }
 
@@ -66,6 +70,10 @@ export const createBrowseStateSlice = (
       return set({ queueCursor });
     },
 
+    setSearchDraft: (searchDraft: string) => {
+      return set({ searchDraft });
+    },
+
     pushSearchHistory: (query: string) => {
       if (query.length === 0) {
         return;
@@ -75,6 +83,56 @@ export const createBrowseStateSlice = (
         SEARCH_HISTORY_LIMIT
       );
       return set({ searchHistory: history });
+    },
+
+    // ↑ in search mode (spec §4): one entry older in the session history,
+    // newest first; from the live draft the newest entry is one up.
+    searchHistoryPrevious: () => {
+      const store = get();
+      if (store.searchHistory.length === 0) {
+        return;
+      }
+      const index = store.searchHistory.indexOf(store.searchDraft);
+      let next = 0;
+      if (index !== -1) {
+        next = Math.min(index + 1, store.searchHistory.length - 1);
+      }
+      return store.setSearchDraft(store.searchHistory[next]);
+    },
+
+    // ↓ in search mode (spec §4): back toward the newest entry, then back to
+    // the live query itself.
+    searchHistoryNext: () => {
+      const store = get();
+      const index = store.searchHistory.indexOf(store.searchDraft);
+      if (index === -1) {
+        return;
+      }
+      if (index === 0) {
+        return store.setSearchDraft(store.searchValue);
+      }
+      return store.setSearchDraft(store.searchHistory[index - 1]);
+    },
+
+    // Search without leaving the browse screen (spec §5.4): copy the draft
+    // into the live query, reset the pagination state and run today's
+    // handleSearchSubmit() (which also pushes the session history). Bulk
+    // selections, the download queue and downloadProgressMap are not touched;
+    // backToSearch() is NOT called (it would change the layout and reset the
+    // app state).
+    submitSearchFromBrowse: async () => {
+      const store = get();
+      const query = store.searchDraft;
+
+      store.setSearchValue(query);
+      set({ searchDraft: "", browseFocus: "list" });
+
+      store.setCurrentPage(1);
+      store.setListItemsCursor(0);
+      store.setNextPageStatus("idle");
+      store.resetEntryCacheMap();
+
+      await store.handleSearchSubmit();
     },
 
     // `q` (spec §4, §6.1): exit straight away when nothing is pending, open

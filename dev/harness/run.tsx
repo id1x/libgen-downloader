@@ -34,6 +34,7 @@ type Mode =
   | "outage"
   | "error"
   | "statuses"
+  | "longtitle"
   | "clibulk";
 
 const MODE = (process.env.MODE ?? "normal") as Mode;
@@ -209,6 +210,30 @@ const seedStore = () => {
 
   if (MODE === "error") {
     patch.errorMessage = "Simulated fatal error (MODE=error)";
+  }
+
+  if (MODE === "longtitle") {
+    // Spec §8.4 edge cases: a title far longer than any column wraps in the
+    // full-screen detail (rows truncate it with … instead) and missing
+    // fields render as the `—` placeholder. Seeds the browse screen directly,
+    // no search needed.
+    patch.activeLayout = LAYOUT_KEY.BROWSE_LAYOUT;
+    patch.searchValue = "master";
+    patch.entries = [
+      {
+        id: "fake-entry-long",
+        authors: "A Very Long Author Name That Goes On And On And Keeps Going, Second Author",
+        title:
+          "The Simulated And Extremely Long Book Title That Certainly Does Not Fit Into Any Column Of The Results Table",
+        publisher: "",
+        year: "",
+        pages: "",
+        language: "",
+        size: "1 MB",
+        extension: "pdf",
+        mirror: `https://mirror-a.example/ads.php?md5=${"a".repeat(32)}`,
+      },
+    ];
   }
 
   if (MODE === "clibulk") {

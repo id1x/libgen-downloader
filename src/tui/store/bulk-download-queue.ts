@@ -291,7 +291,9 @@ export const createBulkDownloadQueueStateSlice = (
         ...initialBulkDownloadQueueState,
         bulkDownloadSelectedEntries: failedSelections,
       });
-      get().setActiveLayout(LAYOUT_KEY.RESULT_LIST_LAYOUT);
+      // The old result-list layout is gone (spec §6.3); the list is the
+      // browse screen now.
+      get().setActiveLayout(LAYOUT_KEY.BROWSE_LAYOUT);
     },
 
     startBulkDownload: async () => {

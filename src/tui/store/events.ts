@@ -90,6 +90,11 @@ export const createEventActionsSlice = (
         return;
       }
 
+      // Session search history (spec §5.4): every search the session runs is
+      // remembered, newest first — including the first one, which is
+      // submitted from the search screen rather than the browse screen.
+      store.pushSearchHistory(store.searchValue);
+
       store.allowWaitingForLibgen();
       store.setActiveLayout(LAYOUT_KEY.BROWSE_LAYOUT);
       store.setIsLoading(true);

@@ -86,10 +86,19 @@ export const Label = {
     ["space", "bulk"],
     ["d", "download"],
   ] as ReadonlyArray<readonly [string, string]>,
+  FOOTER_SEARCH: [
+    ["enter", "search"],
+    ["esc", "cancel"],
+    ["↑↓", "history"],
+    ["ctrl+u", "clear"],
+  ] as ReadonlyArray<readonly [string, string]>,
 
   // Warnings for the list-mode keys (spec §4).
   NO_MORE_RESULTS: "No more results",
   BULK_ALREADY_RUNNING: "Bulk download already running",
+  // The search screen's minimum-chars warning, shared with the browse
+  // screen's search mode (spec §4: "otherwise shows the existing warning").
+  SEARCH_MIN_CHAR_WARNING: "Search string must contain minimum 3 characters.",
 
   // Side panel (spec §3)
   SIDE_PANEL_TAB_DETAIL: "Detail",
@@ -145,6 +154,17 @@ export const Label = {
     ["r", "retry failed"],
     ["esc", "back"],
   ] as ReadonlyArray<readonly [string, string]>,
+
+  // Search history panel (spec §5.4): shown in the side panel while the
+  // search input has the focus.
+  SEARCH_PANEL_TITLE: "Search",
+  SEARCH_HISTORY_TITLE: "Recent searches",
+  SEARCH_HISTORY_HINT: "↑↓ pick · enter search · esc cancel",
+  SEARCH_HISTORY_KEPT_NOTE: "Selections are kept across searches:",
+  SEARCH_HISTORY_BULK_SUFFIX: "in bulk queue",
+  // The search line's right-hand hints while the input has the focus
+  // (spec §5.4's mock).
+  SEARCH_LINE_HINTS: "enter search · esc cancel",
 
   // Help overlay (spec §5.5). Rows are [keys, description] pairs; keys render
   // bold cyan and descriptions gray like the footer. The full-screen detail

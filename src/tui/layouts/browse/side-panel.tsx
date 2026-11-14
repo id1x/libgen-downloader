@@ -5,6 +5,7 @@ import { unfinishedQueueCount } from "./queue-count";
 import { EntryDetail } from "./entry-detail";
 import type { DetailLayout } from "./entry-detail";
 import { QueuePanel } from "./queue-panel";
+import { SearchHistory } from "./search-history";
 
 interface Properties {
   width: number;
@@ -16,9 +17,13 @@ interface Properties {
 
 // The right-hand side panel (spec §3): Detail tab in M2, Queue tab kept
 // rendered for M4. The border title's N is the unfinished-item count computed
-// from the store, never from rendered rows.
+// from the store, never from rendered rows. While the search input has the
+// focus the panel becomes the Search panel with the session's recent
+// searches (spec §5.4); in stacked mode it replaces the Detail panel the
+// same way.
 export function SidePanel({ width, height, detailLayout }: Properties) {
   const sidePanel = useBoundStore((state) => state.sidePanel);
+  const browseFocus = useBoundStore((state) => state.browseFocus);
   const entries = useBoundStore((state) => state.entries);
   const listItemsCursor = useBoundStore((state) => state.listItemsCursor);
   const mirrorAdapter = useBoundStore((state) => state.mirrorAdapter);
@@ -47,6 +52,7 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
     queueLabel = `${Label.SIDE_PANEL_TAB_QUEUE} ${queueCount}`;
   }
 
+  const searchActive = browseFocus === "search";
   const detailActive = sidePanel === "detail";
 
   // Top border with the `Detail │ Queue N` tabs (spec §3): the active tab
@@ -71,6 +77,41 @@ export function SidePanel({ width, height, detailLayout }: Properties) {
   if (!detailActive) {
     queueColor = undefined;
     queueBold = true;
+  }
+
+  if (searchActive) {
+    // The Search panel (spec §5.4): a plain `Search` title, no tabs and no
+    // `v` hint — the history list takes the panel in every layout mode.
+    const searchPrefixLength = 3 + Label.SEARCH_PANEL_TITLE.length + 1; // "╭─ <title> "
+    let searchDashes = width - searchPrefixLength - 2; // "─╮"
+    if (searchDashes < 1) {
+      searchDashes = 1;
+    }
+
+    return (
+      <Box flexDirection="column" width={width}>
+        <Text wrap="truncate-end">
+          <Text color="gray">╭─ </Text>
+          <Text>{Label.SEARCH_PANEL_TITLE}</Text>
+          <Text color="gray">
+            {" "}
+            {"─".repeat(searchDashes)}
+            ─╮
+          </Text>
+        </Text>
+        <Box
+          borderStyle="round"
+          borderTop={false}
+          borderColor="gray"
+          width={width}
+          height={Math.max(height - 1, 2)}
+          flexDirection="column"
+          overflow="hidden"
+        >
+          <SearchHistory width={width - 2} height={Math.max(height - 2, 0)} />
+        </Box>
+      </Box>
+    );
   }
 
   return (

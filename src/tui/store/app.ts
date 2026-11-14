@@ -1,6 +1,5 @@
 import { TCombinedStore } from "./index";
 import { Entry } from "../../api/models/entry";
-import { ListItem } from "../../api/models/list-item";
 import { NextPageStatus } from "../../utilities";
 import { LAYOUT_KEY } from "../layouts/keys";
 import { clearScreen } from "../helpers/display";
@@ -16,7 +15,6 @@ export interface IAppState {
   CLIMode: boolean;
 
   isLoading: boolean;
-  anyEntryExpanded: boolean;
   showSearchMinCharWarning: boolean;
 
   loaderMessage: string;
@@ -26,12 +24,9 @@ export interface IAppState {
   warningTimeout: NodeJS.Timeout | undefined;
 
   currentPage: number;
-  activeExpandedListLength: number;
   listItemsCursor: number;
 
-  detailedEntry: Entry | undefined;
   entries: Entry[];
-  listItems: ListItem[];
   activeLayout: LAYOUT_KEY;
 
   nextPageStatus: NextPageStatus;
@@ -41,7 +36,6 @@ export interface IAppState {
   setCLIMode: (CLIMode: boolean) => void;
 
   setIsLoading: (isLoading: boolean) => void;
-  setAnyEntryExpanded: (anyEntryExpanded: boolean) => void;
 
   setLoaderMessage: (loaderMessage: string) => void;
   setSearchValue: (searchValue: string) => void;
@@ -49,10 +43,8 @@ export interface IAppState {
   setWarningMessage: (warningMessage: string | undefined) => void;
 
   setCurrentPage: (currentPage: number) => void;
-  setActiveExpandedListLength: (activeExpandedListLength: number) => void;
   setListItemsCursor: (listItemsCursor: number) => void;
 
-  setDetailedEntry: (detailedEntry: Entry | undefined) => void;
   setEntries: (entries: Entry[]) => void;
   setActiveLayout: (activeLayout: LAYOUT_KEY) => void;
 
@@ -68,7 +60,6 @@ export interface IAppState {
 
 export const initialAppState = {
   isLoading: false,
-  anyEntryExpanded: false,
   showSearchMinCharWarning: true,
 
   loaderMessage: "",
@@ -78,12 +69,9 @@ export const initialAppState = {
   warningTimeout: undefined,
 
   currentPage: 1,
-  activeExpandedListLength: 0,
   listItemsCursor: 0,
 
-  detailedEntry: undefined,
   entries: [],
-  listItems: [],
   activeLayout: LAYOUT_KEY.SEARCH_LAYOUT,
 
   nextPageStatus: "idle" as NextPageStatus,
@@ -107,9 +95,6 @@ export const createAppStateSlice = (
 
     setIsLoading: (isLoading: boolean) => {
       return set({ isLoading });
-    },
-    setAnyEntryExpanded: (anyEntryExpanded: boolean) => {
-      return set({ anyEntryExpanded });
     },
 
     setLoaderMessage: (loaderMessage: string) => {
@@ -140,16 +125,10 @@ export const createAppStateSlice = (
     setCurrentPage: (currentPage: number) => {
       return set({ currentPage });
     },
-    setActiveExpandedListLength: (activeExpandedListLength: number) => {
-      return set({ activeExpandedListLength });
-    },
     setListItemsCursor: (listItemsCursor: number) => {
       return set({ listItemsCursor });
     },
 
-    setDetailedEntry: (detailedEntry: Entry | undefined) => {
-      return set({ detailedEntry });
-    },
     setEntries: (entries: Entry[]) => {
       // The browse list renders `entries` directly and `listItemsCursor`
       // indexes into `entries`; menu options no longer get mixed into the

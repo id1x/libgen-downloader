@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { Text } from "ink";
 
-import { SEARCH_MIN_CHAR } from "../../../../constants";
+import { Label } from "../../../../labels";
 import { useBoundStore } from "../../../store/index";
 
 const SearchWarning: FC = () => {
@@ -13,7 +13,7 @@ const SearchWarning: FC = () => {
 
   return (
     <Text color="yellow" wrap="truncate">
-      Search string must contain minimum {SEARCH_MIN_CHAR} characters.
+      {Label.SEARCH_MIN_CHAR_WARNING}
     </Text>
   );
 };

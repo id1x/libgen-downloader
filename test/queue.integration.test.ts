@@ -346,6 +346,6 @@ describe("bulk download retries", () => {
     const state = useBoundStore.getState();
     expect(Object.values(state.bulkDownloadSelectedEntries)).toEqual([failed]);
     expect(state.bulkDownloadQueue).toEqual([]);
-    expect(state.activeLayout).toBe(LAYOUT_KEY.RESULT_LIST_LAYOUT);
+    expect(state.activeLayout).toBe(LAYOUT_KEY.BROWSE_LAYOUT);
   });
 });

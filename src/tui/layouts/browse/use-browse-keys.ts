@@ -2,6 +2,7 @@ import { useInput } from "ink";
 import type { Key } from "ink";
 import objectHash from "object-hash";
 import type { Entry } from "../../../api/models/entry";
+import { SEARCH_MIN_CHAR } from "../../../constants";
 import { Label } from "../../../labels";
 import { useBoundStore } from "../../store";
 import { buildQueueModel, type QueueModel } from "./queue-rows";
@@ -30,6 +31,12 @@ interface KeyActions {
   removeBulkUnderCursor: () => void;
   retryFailedBulk: () => void;
   actOnCursorEntry: (action: "toggle" | "download") => void;
+  enterSearch: () => void;
+  cancelSearch: () => void;
+  submitSearch: () => void;
+  searchHistoryUp: () => void;
+  searchHistoryDown: () => void;
+  clearSearchDraft: () => void;
 }
 
 // Keys in `list` mode (spec §4). `cursorEntry` is the entry under the cursor;
@@ -104,6 +111,11 @@ const handleListKeys = (
     return;
   }
 
+  if (input === "/") {
+    actions.enterSearch();
+    return;
+  }
+
   if (input === "b") {
     actions.startBulkDownload();
     return;
@@ -172,6 +184,11 @@ const handleQueueKeys = (input: string, key: Key, actions: KeyActions, bannerAct
     return;
   }
 
+  if (input === "/") {
+    actions.enterSearch();
+    return;
+  }
+
   if (input === "?") {
     actions.openHelp();
     return;
@@ -223,6 +240,37 @@ const handleFullDetailKeys = (
 const handleHelpKeys = (input: string, key: Key, actions: KeyActions): void => {
   if (key.escape || input === "?") {
     actions.closeOverlay();
+  }
+};
+
+// Keys in `search` mode (spec §4): enter runs the query when it has 3+
+// characters (otherwise the search screen's minimum-chars warning), esc
+// cancels and restores the previous query, ↑↓ move through the session
+// history and ctrl+u clears the input. Every other key belongs to the
+// `ink-text-input`, so typing `q` or `d` inserts the letter.
+const handleSearchKeys = (input: string, key: Key, actions: KeyActions): void => {
+  if (key.escape) {
+    actions.cancelSearch();
+    return;
+  }
+
+  if (key.return) {
+    actions.submitSearch();
+    return;
+  }
+
+  if (key.upArrow) {
+    actions.searchHistoryUp();
+    return;
+  }
+
+  if (key.downArrow) {
+    actions.searchHistoryDown();
+    return;
+  }
+
+  if (key.ctrl && input === "u") {
+    actions.clearSearchDraft();
   }
 };
 
@@ -421,6 +469,43 @@ export function useBrowseKeys() {
         }
         toggleBulkSelectionFor(row.entry);
       },
+      // `/` from list or queue mode (spec §4): focus the search input,
+      // starting from the live query so it can be edited in place.
+      enterSearch: () => {
+        const store = useBoundStore.getState();
+        store.setSearchDraft(store.searchValue);
+        setBrowseFocus("search");
+      },
+      // esc in search mode: back to the list with the previous query
+      // restored (spec §4).
+      cancelSearch: () => {
+        const store = useBoundStore.getState();
+        store.setSearchDraft(store.searchValue);
+        setBrowseFocus("list");
+      },
+      submitSearch: () => {
+        const store = useBoundStore.getState();
+        if (store.searchDraft.length < SEARCH_MIN_CHAR) {
+          store.setWarningMessage(Label.SEARCH_MIN_CHAR_WARNING);
+          return;
+        }
+        store.submitSearchFromBrowse();
+      },
+      searchHistoryUp: () => {
+        useBoundStore.getState().searchHistoryPrevious();
+      },
+      searchHistoryDown: () => {
+        useBoundStore.getState().searchHistoryNext();
+      },
+      // ctrl+u clears the input (spec §4). ink-text-input also receives the
+      // key — it inserts the letter — and its handler may run before or after
+      // this one depending on subscription order, so the clear is deferred
+      // past the whole keypress and is always the last write.
+      clearSearchDraft: () => {
+        queueMicrotask(() => {
+          useBoundStore.getState().setSearchDraft("");
+        });
+      },
     };
 
     switch (browseFocus) {
@@ -446,6 +531,10 @@ export function useBrowseKeys() {
       }
       case "fullDetail": {
         handleFullDetailKeys(input, key, actions, cursorEntry);
+        break;
+      }
+      case "search": {
+        handleSearchKeys(input, key, actions);
         break;
       }
       case "help": {

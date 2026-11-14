@@ -2,12 +2,7 @@ import { Layout } from "./layout";
 import { LAYOUT_KEY } from "./keys";
 import Search from "./search/index";
 import { BrowseLayout } from "./browse/index";
-import { ResultList } from "./result-list/index";
-import { ResultListContextProvider } from "../contexts/result-list-context";
-import { Detail } from "./detail/index";
 import { BulkDownload } from "./bulk-download";
-import { BulkDownloadBeforeExit } from "./bulk-download-before-exit";
-import { DownloadQueueBeforeExit } from "./download-queue-before-exit";
 
 export function Layouts() {
   return (
@@ -20,26 +15,9 @@ export function Layouts() {
         <BrowseLayout />
       </Layout>
 
-      <Layout layoutName={LAYOUT_KEY.RESULT_LIST_LAYOUT}>
-        <ResultListContextProvider>
-          <ResultList />
-        </ResultListContextProvider>
-      </Layout>
-
-      <Layout layoutName={LAYOUT_KEY.DETAIL_LAYOUT}>
-        <Detail />
-      </Layout>
-
+      {/* CLI mode still renders the old bulk screen (spec §5.8). */}
       <Layout layoutName={LAYOUT_KEY.BULK_DOWNLOAD_LAYOUT}>
         <BulkDownload />
-      </Layout>
-
-      <Layout layoutName={LAYOUT_KEY.BULK_DOWNLOAD_BEFORE_EXIT_LAYOUT}>
-        <BulkDownloadBeforeExit />
-      </Layout>
-
-      <Layout layoutName={LAYOUT_KEY.DOWNLOAD_QUEUE_BEFORE_EXIT_LAYOUT}>
-        <DownloadQueueBeforeExit />
       </Layout>
     </>
   );

@@ -277,3 +277,66 @@ code or left a case unclear. Smallest-change choices, newest last.
   network/filesystem. The run renders the unchanged old bulk screen, writes
   the MD5 list files to the cwd and exits via `handleExit`. Documented here
   rather than in `dev/README.md`, which is outside this ticket's file scope.
+
+- **M5, the history push lives in `handleSearchSubmit`** — §5.4 puts the
+  history push in `submitSearchFromBrowse`, but that would leave the
+  session's first search (submitted from `SEARCH_LAYOUT`) out of the history,
+  and §5.4's own mock shows the query that produced the current results as a
+  history row. The push therefore happens in `handleSearchSubmit` after its
+  min-chars guard; `submitSearchFromBrowse` delegates to it, and the
+  double-push the browse path would otherwise make is absorbed by
+  `pushSearchHistory`'s dedupe.
+
+- **M5, search mode's focus lifecycle** — §4/§5.4 leave three small holes,
+  filled as follows. `/` (list or queue mode) seeds `searchDraft` with the
+  live query, so the input opens editing it in place. A submit sets
+  `browseFocus` back to `"list"` (search is an editing mode; after `enter`
+  the results load into the list). esc restores the live query into the draft
+  before leaving, which is what "cancels and restores the previous query"
+  observes.
+
+- **M5, the history cursor is the draft itself** — no extra store field: ↑/↓
+  walk `searchHistory` (newest first) by rewriting `searchDraft`, ↓ past the
+  newest entry lands back on the live query, and the SearchHistory panel
+  derives its `❯` from `searchHistory.indexOf(searchDraft)`, defaulting to
+  row 0 while the draft is not in the history (which is exactly the §5.4
+  mock's state: cursor on the first row while "python ty" is being typed).
+
+- **M5, `ctrl+u` is deferred past the keypress** — `ink-text-input` also
+  receives ctrl+u (Ink reports `input = "u"`, `key.ctrl`) and its handler
+  inserts the letter; which of the two handlers runs first depends on
+  subscription order, which reshuffles on every re-render. The router
+  therefore queues the clear on a microtask, so it is always the last write
+  of that keypress and no "u" survives the clear.
+
+- **M5, the search line's right side swaps page info for the mock's hints** —
+  §5.4's mock shows `enter search · esc cancel` right of the input on the
+  search line itself, while §4's footer table gives search mode its own
+  footer row. Both render: the page info is hidden while the input has the
+  focus (the results are about to change anyway) and the footer shows
+  `enter search  esc cancel  ↑↓ history  ctrl+u clear`.
+
+- **M5, the SearchHistory panel fits its content to the panel height** — the
+  first cut rendered the mock's full layout unconditionally and the stacked
+  panel (5 content rows) flex-shrank the overflow into mangled output
+  (dropped lines, eaten characters — Ink shrinks `Text` children of a
+  fixed-height box). Like the queue panel, the content is now fitted: wide
+  panels get the mock's full layout (title, blank, rows, blank, hint, blank,
+  note, count); when that does not fit, the blank separators are dropped
+  first, and only then are lines cut from the bottom.
+
+- **M5, `returnToListKeepingFailedSelected` targets `BROWSE_LAYOUT`** — the
+  old result-list layout is deleted (§6.3). The action is only reachable from
+  the old bulk screen's after-complete options, which render when
+  `!CLIMode && isBulkDownloadComplete` — unreachable since M4 moved
+  interactive bulk runs in place — so the retarget only keeps the CLI-adjacent
+  screen compiling; the queue integration test's expectation moved with it.
+
+- **M5, harness `MODE=longtitle` for the §8.4 wrap edge** — the fake titles
+  (~51 chars) never exceed a 60-column full-detail panel, so "long titles
+  wrap in full detail" had no observable capture. longtitle seeds the browse
+  screen directly (no search) with one entry whose title/author exceed every
+  column and whose publisher/year/pages/language are empty, demonstrating the
+  row truncation, the full-detail wrap and the `—` placeholder in one capture.
+  Documented here rather than in `dev/README.md`, which is outside this
+  ticket's file scope.

@@ -7,6 +7,7 @@ import type { Entry } from "../../../api/models/entry";
 import { useBoundStore } from "../../store";
 import { MirrorFailover } from "../../components/mirror-failover";
 import type { ResultColumns } from "./layout-metrics";
+import type { RowStatus } from "./row-status";
 import { rowStatus } from "./row-status";
 import {
   ResultRow,
@@ -23,6 +24,9 @@ interface Properties {
   // Total panel height including the border rows.
   height: number;
   columns: ResultColumns;
+  // Search focus dims the panel (spec §5.4): all text gray, no status
+  // labels, gray border.
+  dimmed?: boolean;
 }
 
 // The results panel draws its own top border line so the title and the
@@ -82,7 +86,7 @@ const headerLine = (columns: ResultColumns): string => {
   return line;
 };
 
-export function ResultsPanel({ width, height, columns }: Properties) {
+export function ResultsPanel({ width, height, columns, dimmed }: Properties) {
   const entries = useBoundStore((state) => state.entries);
   const listItemsCursor = useBoundStore((state) => state.listItemsCursor);
   const currentPage = useBoundStore((state) => state.currentPage);
@@ -110,11 +114,18 @@ export function ResultsPanel({ width, height, columns }: Properties) {
   const viewport = Math.max(contentRows - 1, 0); // dim header row
   const start = visibleWindowStart(cursor, count, viewport);
 
+  // Dimmed status column: no labels, blank cell (spec §5.4).
+  const dimmedStatus: RowStatus = { symbol: "", color: "gray", kind: "none" };
+  let titleColor: string | undefined;
+  if (dimmed) {
+    titleColor = "gray";
+  }
+
   return (
     <Box flexDirection="column" width={width}>
       <Text wrap="truncate-end">
         <Text color="gray">╭─ </Text>
-        <Text>{Label.RESULTS_PANEL_TITLE}</Text>
+        <Text color={titleColor}>{Label.RESULTS_PANEL_TITLE}</Text>
         <Text color="gray"> {borderTopTail(width, marker)}</Text>
       </Text>
       <Box
@@ -152,7 +163,7 @@ export function ResultsPanel({ width, height, columns }: Properties) {
           if (count === 0) {
             return (
               <Box flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
-                <Text>{`${Label.NO_RESULTS} "${searchValue}"`}</Text>
+                <Text color={titleColor}>{`${Label.NO_RESULTS} "${searchValue}"`}</Text>
               </Box>
             );
           }
@@ -165,12 +176,15 @@ export function ResultsPanel({ width, height, columns }: Properties) {
                 // Bulk membership is keyed by objectHash(entry) in the store
                 // (spec §8.4, same-book dedupe).
                 const bulkSelected = Boolean(bulkDownloadSelectedEntries[objectHash(entry)]);
-                const status = rowStatus(entry, {
-                  downloadProgressMap,
-                  bulkSelected,
-                  bulkQueue: bulkDownloadQueue,
-                  mirrorAdapter,
-                });
+                let status: RowStatus = dimmedStatus;
+                if (!dimmed) {
+                  status = rowStatus(entry, {
+                    downloadProgressMap,
+                    bulkSelected,
+                    bulkQueue: bulkDownloadQueue,
+                    mirrorAdapter,
+                  });
+                }
                 return (
                   <ResultRow
                     key={entry.id}
@@ -179,6 +193,7 @@ export function ResultsPanel({ width, height, columns }: Properties) {
                     isCursor={entryIndex === cursor}
                     status={status}
                     widths={columns}
+                    dimmed={dimmed}
                   />
                 );
               })}

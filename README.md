@@ -66,6 +66,33 @@ chmod +x ./libgen-downloader-linux-*
 
   ```
 
+- One browse screen with keys for everything (no menus). The result list sits
+  next to a detail panel on wide terminals and stacks below it on narrow ones;
+  a queue panel and a search history panel share the side panel.
+
+  | Key | Action |
+  | --- | --- |
+  | `↑` `↓` / `k` `j` | move the cursor (stops at both ends) |
+  | `PgUp` `PgDn` | move 10 rows |
+  | `g` / `G` | first / last row |
+  | `←` `→` / `h` `l` | previous / next page |
+  | `space` / `tab` | add the cursor item to (or remove it from) the bulk queue |
+  | `d` | download the cursor item directly |
+  | `enter` | full-screen detail for the cursor item |
+  | `/` | focus the search input and search in place |
+  | `b` | start the bulk download of the selection |
+  | `v` | toggle the side panel between Detail and Queue |
+  | `r` | retry failed bulk downloads |
+  | `?` | help overlay |
+  | `q` | quit (asks first when downloads are pending) |
+
+  In the Queue panel `↑↓` move over its rows, `x` removes the row's item from
+  the bulk selection and `esc` or `v` goes back to the list. In the search
+  input `enter` runs the query, `esc` cancels and restores the previous query,
+  `↑↓` walk through the recent searches and `ctrl+u` clears the input. In the
+  full-screen detail `esc` goes back, `space`/`d` still act on the shown entry
+  and `↑↓` move to the previous or next entry.
+
 
 
 ## Changelogs
