@@ -20,6 +20,7 @@ export const Label = {
   CONNECTION_ERROR: "Connection error",
   TRYING_OTHER_MIRRORS: "Trying other mirrors...",
   ALL_MIRRORS_FAILED: "All mirrors failed. Please try again later.",
+  SEARCH_FAILED: "Search failed unexpectedly. Please try again.",
   NEXT_PAGE_CHECKING: "→ Next Page",
   NEXT_PAGE_ERROR: "→ Next Page (?) (Retry)",
   NEXT_PAGE_UNAVAILABLE: "→ Next Page (no results on next page)",

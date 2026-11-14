@@ -154,6 +154,30 @@ describe("search integration", () => {
     expect(state.isLoading).toBe(false);
   });
 
+  it("marks the next-page check as errored when the search rejects", async () => {
+    useBoundStore.setState({
+      searchValue: "typescript",
+      search: mock(() => Promise.reject(new Error("search exploded"))),
+    });
+
+    useBoundStore.getState().checkNextPage("typescript", 2);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(useBoundStore.getState().nextPageStatus).toBe("error");
+  });
+
+  it("reports an error instead of rejecting when the search itself rejects", async () => {
+    const search = mock(() => Promise.reject(new Error("search exploded")));
+    const checkNextPage = mock(() => {});
+    useBoundStore.setState({ searchValue: "typescript", search, checkNextPage });
+
+    await expect(useBoundStore.getState().handleSearchSubmit()).resolves.toBeUndefined();
+
+    const state = useBoundStore.getState();
+    expect(state.isLoading).toBe(false);
+    expect(state.errorMessage).toBe(Label.SEARCH_FAILED);
+  });
+
   it("moves to a cached next page and schedules the following page check", async () => {
     const lookupPageCache = mock(() => [entry]);
     const checkNextPage = mock(() => {});

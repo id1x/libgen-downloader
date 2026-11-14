@@ -5,6 +5,7 @@ import { SEARCH_RESOLUTION_TIMEOUT_MS } from "../../settings";
 import { attempt } from "../../utilities";
 import { appServices } from "../../api/services/shared-services";
 import type { SearchResult } from "../../api/search/types";
+import type { Entry } from "../../api/models/entry";
 import { SearchFlow } from "./flows/search-flow";
 
 export interface IEventActions {
@@ -53,11 +54,26 @@ export const createEventActionsSlice = (
         return page;
       }
 
-      const entries = await mirrorAdapter.resolveEntries(
-        page.document,
-        page.url,
-        AbortSignal.timeout(SEARCH_RESOLUTION_TIMEOUT_MS)
-      );
+      // Parsing a fetched page must never reject: an unexpected failure (the
+      // reranker model failing to load, an aborted resolution, a parser bug)
+      // becomes an error result the flows already know how to recover from.
+      let entries: Entry[];
+      try {
+        entries = await mirrorAdapter.resolveEntries(
+          page.document,
+          page.url,
+          AbortSignal.timeout(SEARCH_RESOLUTION_TIMEOUT_MS)
+        );
+      } catch (error: unknown) {
+        let reason = "unknown cause";
+        if (error instanceof Error && error.message) {
+          reason = error.message;
+        }
+        return {
+          status: "error",
+          message: `Couldn't parse the search results for "${query}": ${reason}`,
+        };
+      }
 
       store.setEntryCacheMap(page.url, entries);
       return { status: "success", entries };
@@ -68,20 +84,29 @@ export const createEventActionsSlice = (
       // Re-render the list with the checking state
       store.setEntries(store.entries);
 
-      store.search(query, pageNumber).then((result) => {
-        const currentStore = get();
-        if (result.status === "success") {
-          if (result.entries.length > 0) {
-            currentStore.setNextPageStatus("ready");
+      store
+        .search(query, pageNumber)
+        .then((result) => {
+          const currentStore = get();
+          if (result.status === "success") {
+            if (result.entries.length > 0) {
+              currentStore.setNextPageStatus("ready");
+            } else {
+              currentStore.setNextPageStatus("unavailable");
+            }
           } else {
-            currentStore.setNextPageStatus("unavailable");
+            currentStore.setNextPageStatus("error");
           }
-        } else {
+          // Re-render the list with the updated nextPageStatus
+          currentStore.setEntries(currentStore.entries);
+        })
+        .catch(() => {
+          // A rejected check must surface as the retryable (?) state, never as
+          // an unhandled rejection that kills the app.
+          const currentStore = get();
           currentStore.setNextPageStatus("error");
-        }
-        // Re-render the list with the updated nextPageStatus
-        currentStore.setEntries(currentStore.entries);
-      });
+          currentStore.setEntries(currentStore.entries);
+        });
     },
     handleSearchSubmit: async () => {
       const store = get();
@@ -100,9 +125,17 @@ export const createEventActionsSlice = (
       store.setIsLoading(true);
       store.setLoaderMessage(Label.GETTING_RESULTS);
 
-      const result = await store.search(store.searchValue, store.currentPage);
-
-      await new SearchFlow(get).handle(result);
+      // A rejection here (as opposed to a failure result, which the flow
+      // recovers from) is an unexpected bug: stop loading and report it
+      // instead of dying on an unhandled rejection.
+      try {
+        const result = await store.search(store.searchValue, store.currentPage);
+        await new SearchFlow(get).handle(result);
+      } catch {
+        const failed = get();
+        failed.setIsLoading(false);
+        failed.setErrorMessage(Label.SEARCH_FAILED);
+      }
     },
     nextPage: async () => {
       const store = get();

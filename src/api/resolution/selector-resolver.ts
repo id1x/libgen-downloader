@@ -6,9 +6,17 @@ import type {
   ResolutionOutcome,
   ResolutionRequest,
   ResolutionStageName,
+  ValidationResult,
 } from "./types";
 import { pathFrom } from "./utils/dom-path";
 import type { CandidateValidator } from "./validators/candidate-validator";
+
+const failureMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return String(error);
+};
 
 export class SelectorResolver<TPayload> {
   constructor(
@@ -23,18 +31,35 @@ export class SelectorResolver<TPayload> {
     let failureKind: FailureKind = "not-available";
 
     for (const stage of this.stages) {
-      const proposed = await stage.propose(request);
-      const proposals = proposed.filter((element) => !checked.has(element));
       const attempt: ResolutionAttempt = {
         stage: stage.name,
-        proposals: proposals.length,
+        proposals: 0,
         failures: [],
       };
       attempts.push(attempt);
 
+      // A stage that throws (the cross-encoder ranker loads its model here,
+      // for example) contributes no proposals; later stages still run. A
+      // resolution failure must degrade, never reject.
+      let proposed: Element[] = [];
+      try {
+        proposed = await stage.propose(request);
+      } catch (error: unknown) {
+        attempt.failures.push(failureMessage(error));
+      }
+
+      const proposals = proposed.filter((element) => !checked.has(element));
+      attempt.proposals = proposals.length;
+
       for (const element of proposals) {
         checked.add(element);
-        const validation = await this.validator.validate(element, request);
+        let validation: ValidationResult<TPayload>;
+        try {
+          validation = await this.validator.validate(element, request);
+        } catch (error: unknown) {
+          attempt.failures.push(failureMessage(error));
+          continue;
+        }
         if (validation.valid) {
           await this.remember(stage.name, element, request);
           return {

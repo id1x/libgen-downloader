@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/obsfx/libgen-downloader",
   "scripts": {
-    "start": "bun run src/index.ts",
+    "start": "bun run models:fetch && bun run src/index.ts",
     "test": "bun test ./test",
     "test:e2e": "bun test ./test/e2e/search-download.live.ts ./test/e2e/self-healing.live.ts --timeout 14400000",
     "typecheck": "tsc --noEmit",
