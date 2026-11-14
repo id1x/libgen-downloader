@@ -65,6 +65,21 @@ export const Label = {
     ["b", "bulk dl"],
     ["?", "help"],
   ] as ReadonlyArray<readonly [string, string]>,
+  FOOTER_HELP: [["esc", "close help"]] as ReadonlyArray<readonly [string, string]>,
+  FOOTER_QUIT: [
+    ["y", "quit"],
+    ["n / esc", "stay"],
+  ] as ReadonlyArray<readonly [string, string]>,
+  FOOTER_FULL_DETAIL: [
+    ["esc", "back"],
+    ["↑↓", "prev/next"],
+    ["space", "bulk"],
+    ["d", "download"],
+  ] as ReadonlyArray<readonly [string, string]>,
+
+  // Warnings for the list-mode keys (spec §4).
+  NO_MORE_RESULTS: "No more results",
+  BULK_ALREADY_RUNNING: "Bulk download already running",
 
   // Side panel (spec §3)
   SIDE_PANEL_TAB_DETAIL: "Detail",
@@ -106,4 +121,51 @@ export const Label = {
     ["d", "download"],
     ["enter", "full screen"],
   ] as ReadonlyArray<readonly [string, string]>,
+
+  // Help overlay (spec §5.5). Rows are [keys, description] pairs; keys render
+  // bold cyan and descriptions gray like the footer. The full-screen detail
+  // panel (§5.7) reuses SIDE_PANEL_TAB_DETAIL as its title.
+  HELP_TITLE: "Keys",
+  HELP_SECTION_NAVIGATE: "Navigate",
+  HELP_SECTION_ACT_ON_ITEM: "Act on item",
+  HELP_SECTION_GLOBAL: "Global",
+  HELP_NAVIGATE_ROWS: [
+    ["↑ ↓  k j", "move cursor"],
+    ["pgup pgdn", "jump 10"],
+    ["g G", "first / last"],
+    ["← →  h l", "prev / next page"],
+  ] as ReadonlyArray<readonly [string, string]>,
+  HELP_ACT_ON_ITEM_ROWS: [
+    ["space", "add / remove from bulk"],
+    ["d", "download now"],
+    ["enter", "full-screen detail"],
+    ["tab", "same as space (legacy)"],
+  ] as ReadonlyArray<readonly [string, string]>,
+  HELP_GLOBAL_ROWS: [
+    ["/", "search"],
+    ["b", "start bulk download"],
+    ["v", "toggle queue panel"],
+    ["r", "retry failed downloads"],
+    ["ctrl+r", "re-check libgen now"],
+    ["?", "this help"],
+    ["q", "quit"],
+  ] as ReadonlyArray<readonly [string, string]>,
+  HELP_CLOSE_HINT: "esc or ? to close",
+
+  // Quit overlay (spec §5.6): only the lines that apply are shown, with
+  // correct singular and plural forms.
+  QUIT_TITLE: "Quit?",
+  QUIT_DOWNLOADS_ONE: "1 download is still running or queued",
+  QUIT_DOWNLOADS_MANY: "downloads are still running or queued",
+  QUIT_BULK_ITEMS_ONE: "1 item is in the bulk queue",
+  QUIT_BULK_ITEMS_MANY: "items are in the bulk queue",
+  QUIT_BULK_RUN: "Bulk download is",
+  QUIT_BULK_RUN_DONE: "done",
+  // The explanation renders as the mockup's two lines (spec §5.6).
+  QUIT_EXPLANATION_LINES: [
+    "Quitting stops the download and",
+    "forgets the bulk selection.",
+  ] as ReadonlyArray<string>,
+  QUIT_ANYWAY: "quit anyway",
+  QUIT_STAY: "stay",
 };

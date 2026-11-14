@@ -132,3 +132,70 @@ code or left a case unclear. Smallest-change choices, newest last.
   one status line padded to two, or two blanks when there is no direct
   status) always occupy lines 3–4 so the bulk line stays on line 5 and the
   panel never reflows.
+
+- **M3, `b` does not set `browseFocus = "queue"`** — §4's table says `b` runs
+  `startBulkDownload()` and then sets the focus to `queue`, but at this
+  milestone the run still lands on the old bulk screen, whose own components
+  own the keys from there. Setting the focus now would leave a stale `queue`
+  value behind when the old flow returns (it never resets `browseFocus`), so
+  the hand-off moves to M4 together with the Queue panel. Also, the "run
+  already active" guard (`bulkDownloadQueue.length > 0 &&
+  !isBulkDownloadComplete`) lives in the key router for now; M4 moves it into
+  `startBulkDownload` per §6.1.
+
+- **M3, priority rule 4's gate is list-mode-only** — §8.3 flow 7 requires esc
+  to close the help overlay while the outage wait runs, and during that wait
+  `isLoading` stays true. The "only q, ?, ctrl+c" gate therefore sits inside
+  the `list` branch of the router; overlay modes keep their own keys live.
+  The banner keeps owning esc in list/queue regardless of loading (its own
+  `isActive`, unchanged semantics).
+
+- **M3, overlays replace the main area (§5.5's first option)** — the centred
+  box takes the main area's rows via justifyContent/alignItems; the search
+  line, warning and banner dim behind it. Ink 6 puts `dimColor` on `Text`
+  only, so the chrome pieces take a `dimmed` prop instead (the spec's
+  alternative). The footer shows the overlay mode's own hints and stays
+  undimmed; the app header (rendered by `app.tsx` above this layout) stays
+  undimmed too. The overlay budget is the full main area
+  (`computeLayout(..., hasSidePanel: false)`), so a banner's five reserved
+  rows shrink the help box and it truncates with `…`.
+
+- **M3, quit-prompt wording follows §5.6's counting rule over the mockup's
+  shorter line** — "N download(s) still running or queued" renders as
+  "1 download is still running or queued" / "N downloads are still running or
+  queued"; the bulk-queue line follows the mockup ("N item(s) are in the bulk
+  queue"); a running run renders "Bulk download is N/M done". The box is 50
+  columns (the mock's content lines are 50 wide; its top border row is drawn
+  one column wider than its content — content wins). The explanation renders
+  as the mockup's two lines. When the box does not fit, blank separators go
+  first, then the content truncates with `…`.
+
+- **M3, `requestQuit`'s pending definition** — §4's table names a direct
+  download active/queued and a non-empty bulk selection; the ticket adds a
+  running bulk run. Implemented as: `inDownloadQueueEntryIds.length > 0`, or
+  the selection is non-empty, or `bulkDownloadQueue.length > 0 &&
+  !isBulkDownloadComplete` (the same condition M4's `startBulkDownload` guard
+  will use). A finished run with a still-non-empty selection therefore opens
+  the prompt, but its bulk-queue line does not render (§5.6 only shows the
+  line while the run has not finished).
+
+- **M3, `enter` requires an entry under the cursor** — on an empty results
+  list enter is a no-op; there is no detail to show. §8.4's zero-results row
+  only promises that `/` and `q` still work.
+
+- **M3, the full-detail marker uses the live count** — §5.7's `Detail  N/25`
+  renders as `Detail  <cursor+1>/<entries.length>` (the same count the
+  results panel's position marker shows), not a hard-coded 25.
+
+- **M3, `/` and `v` stay unwired** — search focus is M5 and `v` toggling is
+  M4; the footer hints already render both and the keys are intentionally
+  dead until then (like M2's `v` border hint).
+
+- **M3, harness `MODE=outage` now drives the real recovery flow** — flow 7's
+  "second esc stops waiting" needs an observable stop: with only a seeded
+  `availabilityStatus` there is no owning flow, so `stopWaitingForLibgen`
+  changes nothing on screen. The fake search in outage mode now returns
+  `connection_error`, the real `SearchFlow` failovers and starts a live wait
+  (the banner's counters tick), and stopping the wait gives up into the
+  fatal-error screen. The seeded waiting status is kept as the pre-show
+  (supersedes the M0 note's outage description).

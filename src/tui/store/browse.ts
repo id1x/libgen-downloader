@@ -20,6 +20,7 @@ export interface IBrowseState {
   toggleSidePanel: () => void;
   setQueueCursor: (queueCursor: number) => void;
   pushSearchHistory: (query: string) => void;
+  requestQuit: () => void;
 }
 
 export const initialBrowseState = {
@@ -74,6 +75,26 @@ export const createBrowseStateSlice = (
         SEARCH_HISTORY_LIMIT
       );
       return set({ searchHistory: history });
+    },
+
+    // `q` (spec §4, §6.1): exit straight away when nothing is pending, open
+    // the quit overlay otherwise. Pending work: a direct download queued or
+    // running, a non-empty bulk selection, a bulk run still going.
+    requestQuit: () => {
+      const store = get();
+      const bulkRunRunning =
+        store.bulkDownloadQueue.length > 0 && !store.isBulkDownloadComplete;
+      const pending =
+        store.inDownloadQueueEntryIds.length > 0 ||
+        Object.keys(store.bulkDownloadSelectedEntries).length > 0 ||
+        bulkRunRunning;
+
+      if (!pending) {
+        store.handleExit();
+        return;
+      }
+
+      store.openOverlay("quit");
     },
   };
 };

@@ -6,13 +6,17 @@ import { formatDuration } from "../helpers/display";
 import { useNow } from "../hooks/use-now";
 import { useBoundStore } from "../store";
 
-export function AvailabilityBanner() {
+export function AvailabilityBanner({ dimmed = false }: { dimmed?: boolean }) {
   const status = useBoundStore((state) => state.availabilityStatus);
   const checkLibgenNow = useBoundStore((state) => state.checkLibgenNow);
   const stopWaitingForLibgen = useBoundStore((state) => state.stopWaitingForLibgen);
+  const browseFocus = useBoundStore((state) => state.browseFocus);
   const isWaiting = status.state !== "available";
   const now = useNow(isWaiting);
 
+  // Priority rule 1 (spec §4): esc stops waiting only in list or queue mode;
+  // in every other mode esc closes that mode first, so the banner's keys are
+  // inactive until the browse screen is back in one of those modes.
   useInput(
     (input, key) => {
       if (key.ctrl && input === "r") {
@@ -23,7 +27,7 @@ export function AvailabilityBanner() {
         stopWaitingForLibgen();
       }
     },
-    { isActive: isWaiting }
+    { isActive: isWaiting && (browseFocus === "list" || browseFocus === "queue") }
   );
 
   if (status.state === "available") {
@@ -37,13 +41,13 @@ export function AvailabilityBanner() {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={1}>
-      <Text wrap="truncate-end">
+      <Text dimColor={dimmed} wrap="truncate-end">
         <Text color="magentaBright">
           {figures.warning} {describeFailureKind(status.outage.kind)}
         </Text>
         <Text color="gray"> ({status.outage.reason})</Text>
       </Text>
-      <Text color="white" wrap="truncate-end">
+      <Text color="white" dimColor={dimmed} wrap="truncate-end">
         {progress}
         <Text color="gray">
           {" "}
@@ -57,7 +61,9 @@ export function AvailabilityBanner() {
           </Text>
         )}
       </Text>
-      <Text color="gray">{Label.LIBGEN_WAIT_CONTROLS}</Text>
+      <Text color="gray" dimColor={dimmed}>
+        {Label.LIBGEN_WAIT_CONTROLS}
+      </Text>
     </Box>
   );
 }

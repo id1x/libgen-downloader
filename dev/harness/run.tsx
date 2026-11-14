@@ -83,6 +83,17 @@ const fakeSearch = async (query: string, page: number): Promise<SearchResult> =>
 
   await sleep(FAKE_SEARCH_DELAY_MS);
 
+  if (MODE === "outage") {
+    // The outage flow needs a wait that the real app owns, so that stopping
+    // it with esc is observable: the search fails with a connection error,
+    // the real recovery flow failovers and starts waiting (the banner's
+    // counters tick), and stopping the wait gives up into the error screen.
+    return {
+      status: "connection_error",
+      message: "Simulated connection error (MODE=outage)",
+    };
+  }
+
   if (MODE === "nextfail" && page > 1) {
     return { status: "error", message: `Simulated next-page failure (MODE=nextfail, page ${page})` };
   }
@@ -181,6 +192,9 @@ const seedStore = () => {
   }
 
   if (MODE === "outage") {
+    // Pre-shows the banner while the real recovery flow (the failing search
+    // below) starts its own wait; the live wait's published statuses then
+    // take over the banner.
     const since = Date.now();
     patch.availabilityStatus = {
       state: "waiting",
