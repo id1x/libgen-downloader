@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createAppStateSlice, IAppState } from "./app";
 import { createAvailabilitySlice, IAvailabilityState } from "./availability";
+import { createBrowseStateSlice, IBrowseState } from "./browse";
 import { createBulkDownloadQueueStateSlice, IBulkDownloadQueueState } from "./bulk-download-queue";
 import { createCacheStateSlice, ICacheState } from "./cache";
 import { createConfigStateSlice, IConfigState } from "./config";
@@ -9,6 +10,7 @@ import { createEventActionsSlice, IEventActions } from "./events";
 
 export type TCombinedStore = IAppState &
   IAvailabilityState &
+  IBrowseState &
   IConfigState &
   IDownloadQueueState &
   IBulkDownloadQueueState &
@@ -18,6 +20,7 @@ export type TCombinedStore = IAppState &
 export const useBoundStore = create<TCombinedStore>((set, get) => ({
   ...createAppStateSlice(set, get),
   ...createAvailabilitySlice(set, get),
+  ...createBrowseStateSlice(set, get),
   ...createConfigStateSlice(set, get),
   ...createDownloadQueueStateSlice(set, get),
   ...createBulkDownloadQueueStateSlice(set, get),

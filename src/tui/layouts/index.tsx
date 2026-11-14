@@ -1,6 +1,7 @@
 import { Layout } from "./layout";
 import { LAYOUT_KEY } from "./keys";
 import Search from "./search/index";
+import { BrowseLayout } from "./browse/index";
 import { ResultList } from "./result-list/index";
 import { ResultListContextProvider } from "../contexts/result-list-context";
 import { Detail } from "./detail/index";
@@ -13,6 +14,10 @@ export function Layouts() {
     <>
       <Layout layoutName={LAYOUT_KEY.SEARCH_LAYOUT}>
         <Search />
+      </Layout>
+
+      <Layout layoutName={LAYOUT_KEY.BROWSE_LAYOUT}>
+        <BrowseLayout />
       </Layout>
 
       <Layout layoutName={LAYOUT_KEY.RESULT_LIST_LAYOUT}>

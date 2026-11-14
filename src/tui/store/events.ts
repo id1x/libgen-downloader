@@ -65,7 +65,7 @@ export const createEventActionsSlice = (
     checkNextPage: (query: string, pageNumber: number) => {
       const store = get();
       store.setNextPageStatus("checking");
-      // Rebuild listItems to show checking state
+      // Re-render the list with the checking state
       store.setEntries(store.entries);
 
       store.search(query, pageNumber).then((result) => {
@@ -79,7 +79,7 @@ export const createEventActionsSlice = (
         } else {
           currentStore.setNextPageStatus("error");
         }
-        // Rebuild listItems with updated nextPageStatus
+        // Re-render the list with the updated nextPageStatus
         currentStore.setEntries(currentStore.entries);
       });
     },
@@ -91,7 +91,7 @@ export const createEventActionsSlice = (
       }
 
       store.allowWaitingForLibgen();
-      store.setActiveLayout(LAYOUT_KEY.RESULT_LIST_LAYOUT);
+      store.setActiveLayout(LAYOUT_KEY.BROWSE_LAYOUT);
       store.setIsLoading(true);
       store.setLoaderMessage(Label.GETTING_RESULTS);
 

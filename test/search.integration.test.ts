@@ -123,7 +123,8 @@ describe("search integration", () => {
 
     const state = useBoundStore.getState();
     expect(search).toHaveBeenCalledWith("typescript", 1);
-    expect(state.activeLayout).toBe(LAYOUT_KEY.RESULT_LIST_LAYOUT);
+    // M1 of the master/detail redesign: a search lands on the browse screen.
+    expect(state.activeLayout).toBe(LAYOUT_KEY.BROWSE_LAYOUT);
     expect(state.entries).toEqual([entry]);
     expect(state.isLoading).toBe(false);
     expect(checkNextPage).toHaveBeenCalledWith("typescript", 2);

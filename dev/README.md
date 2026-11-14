@@ -12,7 +12,7 @@ screens can be inspected and captured without any network access
 | File | Purpose |
 | --- | --- |
 | `preload.ts` | Bun plugin stubbing `src/index.ts` (which runs `operate()` on import) as a safety net; nothing should import it since `src/version.ts` exists. |
-| `run.tsx` | Seeds the zustand store (`useBoundStore.setState`) with three fake mirrors, a fake `search` (700 ms delay, 25 fake entries per page for pages 1–3) and a fake recovering download service (10 × 250 ms data chunks), then renders `<App doNotFetchConfigInitially>`. |
+| `run.tsx` | Seeds the zustand store (`useBoundStore.setState`) with three fake mirrors, a fake `search` (700 ms delay, 25 fake entries per page for pages 1–3; a query matching none of the fake titles returns an empty page, so `zzz`-style queries exercise the zero-results state) and a fake recovering download service (10 × 250 ms data chunks), then renders `<App doNotFetchConfigInitially>`. |
 | `capture.py` | Drives the harness inside a pseudo-terminal (via `pty.fork` + `TIOCSWINSZ`) and prints screen snapshots using [pyte](https://pypi.org/project/pyte/). |
 
 ### Running the harness

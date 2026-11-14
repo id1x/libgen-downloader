@@ -71,7 +71,7 @@ const fakePage = (page: number): Entry[] =>
 
 const FAKE_SEARCH_DELAY_MS = 700;
 
-const fakeSearch = async (_query: string, page: number): Promise<SearchResult> => {
+const fakeSearch = async (query: string, page: number): Promise<SearchResult> => {
   if (MODE === "slow" || MODE === "failover") {
     // failover hangs so the loading skeleton keeps showing the seeded
     // connectionError + mirrorCheckStates (showResults would clear them).
@@ -85,7 +85,18 @@ const fakeSearch = async (_query: string, page: number): Promise<SearchResult> =
   }
 
   if (page >= 1 && page <= 3) {
-    return { status: "success", entries: fakePage(page) };
+    const entries = fakePage(page);
+    // Zero-results scenario (spec §8.4): a query that matches none of the
+    // fake titles returns an empty page. Search a title substring such as
+    // "Simulated" or "book" to get results.
+    const needle = query.trim().toLowerCase();
+    if (
+      needle.length > 0 &&
+      !entries.some((entry) => entry.title.toLowerCase().includes(needle))
+    ) {
+      return { status: "success", entries: [] };
+    }
+    return { status: "success", entries };
   }
 
   return { status: "success", entries: [] };

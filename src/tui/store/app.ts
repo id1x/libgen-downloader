@@ -1,7 +1,7 @@
 import { TCombinedStore } from "./index";
 import { Entry } from "../../api/models/entry";
 import { ListItem } from "../../api/models/list-item";
-import { constructListItems, NextPageStatus } from "../../utilities";
+import { NextPageStatus } from "../../utilities";
 import { LAYOUT_KEY } from "../layouts/keys";
 import { clearScreen } from "../helpers/display";
 
@@ -55,6 +55,9 @@ export interface IAppState {
   setDetailedEntry: (detailedEntry: Entry | undefined) => void;
   setEntries: (entries: Entry[]) => void;
   setActiveLayout: (activeLayout: LAYOUT_KEY) => void;
+
+  moveCursor: (delta: number) => void;
+  setCursorToEdge: (edge: "first" | "last") => void;
 
   setNextPageStatus: (nextPageStatus: NextPageStatus) => void;
   setConnectionError: (connectionError: string | undefined) => void;
@@ -148,33 +151,30 @@ export const createAppStateSlice = (
       return set({ detailedEntry });
     },
     setEntries: (entries: Entry[]) => {
-      const store = get();
-      const listItems = constructListItems({
-        entries,
-        currentPage: store.currentPage,
-        nextPageStatus: store.nextPageStatus,
-        handleSearchOption: store.backToSearch,
-        handleNextPageOption: store.nextPage,
-        handleRetryNextPageOption: () => {
-          store.checkNextPage(store.searchValue, store.currentPage + 1);
-        },
-        handlePrevPageOption: store.prevPage,
-        handleStartBulkDownloadOption: store.startBulkDownload,
-        handleExitOption: () => {
-          if (get().inDownloadQueueEntryIds.length > 0) {
-            store.setActiveLayout(LAYOUT_KEY.DOWNLOAD_QUEUE_BEFORE_EXIT_LAYOUT);
-            return;
-          }
+      // The browse list renders `entries` directly and `listItemsCursor`
+      // indexes into `entries`; menu options no longer get mixed into the
+      // list (spec §6.1).
+      return set({ entries });
+    },
 
-          if (Object.keys(get().bulkDownloadSelectedEntries).length > 0) {
-            store.setActiveLayout(LAYOUT_KEY.BULK_DOWNLOAD_BEFORE_EXIT_LAYOUT);
-            return;
-          }
+    moveCursor: (delta: number) => {
+      const entries = get().entries;
+      let upperBound = entries.length - 1;
+      if (upperBound < 0) {
+        // An empty list keeps the cursor at 0.
+        upperBound = 0;
+      }
+      const nextCursor = Math.min(Math.max(get().listItemsCursor + delta, 0), upperBound);
+      return set({ listItemsCursor: nextCursor });
+    },
 
-          store.handleExit();
-        },
-      });
-      set({ entries, listItems });
+    setCursorToEdge: (edge: "first" | "last") => {
+      const entries = get().entries;
+      let target = 0;
+      if (edge === "last" && entries.length > 0) {
+        target = entries.length - 1;
+      }
+      return set({ listItemsCursor: target });
     },
     setActiveLayout: (activeLayout: LAYOUT_KEY) => {
       const store = get();

@@ -6,8 +6,9 @@ import { SCREEN_BASE_APP_WIDTH } from "../../settings";
 export function useStdoutDimensions(): [number, number] {
   const { stdout } = useStdout();
 
-  const initSize = stdout?.columns || SCREEN_BASE_APP_WIDTH;
-  const [dimensions, setDimensions] = useState<[number, number]>([initSize, initSize]);
+  const initColumns = stdout?.columns || SCREEN_BASE_APP_WIDTH;
+  const initRows = stdout?.rows || initColumns;
+  const [dimensions, setDimensions] = useState<[number, number]>([initColumns, initRows]);
 
   useEffect(() => {
     if (!stdout) {
