@@ -11,8 +11,8 @@ const hintWidth = (hint: readonly [string, string]): number => {
 };
 
 // Footer hint row: keys in bold cyan, descriptions in gray, two spaces
-// between pairs. Hints that no longer fit are dropped and marked with an
-// ellipsis (spec §3, footer).
+// between pairs (the §4 footer format strings are two-spaced). Hints that no
+// longer fit are dropped and marked with an ellipsis (spec §3, footer).
 export function KeyFooter({ hints, width }: Properties) {
   const fitted: Array<readonly [string, string]> = [];
   let used = 0;
@@ -36,7 +36,7 @@ export function KeyFooter({ hints, width }: Properties) {
     <Text wrap="truncate-end">
       {fitted.map(([key, description], index) => (
         <Text key={key}>
-          {index > 0 && <Text color="gray"> </Text>}
+          {index > 0 && <Text color="gray">  </Text>}
           <Text color="cyan" bold={true}>
             {key}
           </Text>

@@ -6,7 +6,7 @@
 //   bun --preload <repo>/dev/harness/preload.ts <repo>/dev/harness/run.tsx
 //
 // MODE env switches scenarios: normal, slow, nextfail, bulkfail, freeze,
-// failover, outage, error.
+// failover, outage, error, statuses.
 
 import { render } from "ink";
 
@@ -19,7 +19,9 @@ import type { Mirror } from "../../src/api/data/types";
 import type { SearchResult } from "../../src/api/search/types";
 import type { RecoveringDownloadService } from "../../src/api/download/recovering-download-service";
 import type { DownloadCallbacks, DownloadOutcome, SourceFailure } from "../../src/api/download/types";
+import { DownloadStatus } from "../../src/download-statuses";
 import { SEARCH_PAGE_SIZE } from "../../src/settings";
+import objectHash from "object-hash";
 
 type Mode =
   | "normal"
@@ -29,7 +31,8 @@ type Mode =
   | "freeze"
   | "failover"
   | "outage"
-  | "error";
+  | "error"
+  | "statuses";
 
 const MODE = (process.env.MODE ?? "normal") as Mode;
 
@@ -190,6 +193,39 @@ const seedStore = () => {
 
   if (MODE === "error") {
     patch.errorMessage = "Simulated fatal error (MODE=error)";
+  }
+
+  if (MODE === "statuses") {
+    // Row-status mix for the §5.1/§5.2 captures: item 1 done, item 2
+    // downloading at 42%, item 4 queued, item 9 failed, items 3/5/7 selected
+    // for bulk. M2 has no download/bulk key paths yet (they arrive in M3/M4),
+    // so the states are seeded directly; the fake entries are deterministic
+    // (ids `fake-entry-<n>`, page-1 indexes 0..24), so the seeds match the
+    // entries the fake search later installs.
+    const total = DOWNLOAD_TOTAL;
+    patch.downloadProgressMap = {
+      "fake-entry-0": {
+        filename: "00000000.pdf",
+        total,
+        progress: total,
+        status: DownloadStatus.DOWNLOADED,
+      },
+      "fake-entry-1": {
+        filename: "01000000.pdf",
+        total,
+        progress: Math.round(total * 0.42),
+        status: DownloadStatus.DOWNLOADING,
+      },
+      "fake-entry-3": { filename: "", total: 0, progress: 0, status: DownloadStatus.IN_QUEUE },
+      "fake-entry-8": { filename: "", total: 0, progress: 0, status: DownloadStatus.FAILED },
+    };
+
+    const selected: Record<string, Entry> = {};
+    for (const index of [2, 4, 6]) {
+      const entry = fakeEntry(1, index);
+      selected[objectHash(entry)] = entry;
+    }
+    patch.bulkDownloadSelectedEntries = selected;
   }
 
   useBoundStore.setState(patch);

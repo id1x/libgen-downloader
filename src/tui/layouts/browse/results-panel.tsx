@@ -1,11 +1,13 @@
 import { Box, Text } from "ink";
 import InkSpinner from "ink-spinner";
+import objectHash from "object-hash";
 import { Label } from "../../../labels";
 import { SEARCH_PAGE_SIZE } from "../../../settings";
 import type { Entry } from "../../../api/models/entry";
 import { useBoundStore } from "../../store";
 import { MirrorFailover } from "../../components/mirror-failover";
 import type { ResultColumns } from "./layout-metrics";
+import { rowStatus } from "./row-status";
 import {
   ResultRow,
   RESULT_CURSOR_WIDTH,
@@ -87,6 +89,10 @@ export function ResultsPanel({ width, height, columns }: Properties) {
   const isLoading = useBoundStore((state) => state.isLoading);
   const searchValue = useBoundStore((state) => state.searchValue);
   const connectionError = useBoundStore((state) => state.connectionError);
+  const mirrorAdapter = useBoundStore((state) => state.mirrorAdapter);
+  const downloadProgressMap = useBoundStore((state) => state.downloadProgressMap);
+  const bulkDownloadSelectedEntries = useBoundStore((state) => state.bulkDownloadSelectedEntries);
+  const bulkDownloadQueue = useBoundStore((state) => state.bulkDownloadQueue);
 
   const count = entries.length;
   let cursor = listItemsCursor;
@@ -156,13 +162,22 @@ export function ResultsPanel({ width, height, columns }: Properties) {
               <Text color="gray">{headerLine(columns)}</Text>
               {entries.slice(start, start + viewport).map((entry: Entry, index: number) => {
                 const entryIndex = start + index;
+                // Bulk membership is keyed by objectHash(entry) in the store
+                // (spec §8.4, same-book dedupe).
+                const bulkSelected = Boolean(bulkDownloadSelectedEntries[objectHash(entry)]);
+                const status = rowStatus(entry, {
+                  downloadProgressMap,
+                  bulkSelected,
+                  bulkQueue: bulkDownloadQueue,
+                  mirrorAdapter,
+                });
                 return (
                   <ResultRow
                     key={entry.id}
                     entry={entry}
                     number={entryIndex + 1 + (currentPage - 1) * SEARCH_PAGE_SIZE}
                     isCursor={entryIndex === cursor}
-                    status=""
+                    status={status}
                     widths={columns}
                   />
                 );

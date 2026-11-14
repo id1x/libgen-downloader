@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Text } from "ink";
 import figures from "figures";
 import type { Entry } from "../../../api/models/entry";
+import type { RowStatus } from "./row-status";
 
 // Column widths from spec §3. The title column is flexible and comes from
 // the layout metrics.
@@ -45,9 +46,9 @@ interface Properties {
   // Global index: order within the page plus the rows of the pages before it.
   number: number;
   isCursor: boolean;
-  // Status column content (spec §3). M1 renders it blank; M2 wires
+  // Status column content (spec §3's row status table), computed with
   // row-status.ts.
-  status: string;
+  status: RowStatus;
   widths: RowWidths;
 }
 
@@ -97,23 +98,26 @@ const ResultRowComponent = ({ entry, number, isCursor, status, widths }: Propert
         {fitCell(entry.size, RESULT_SIZE_WIDTH, "right")}
       </Text>
       <Text backgroundColor={background}> </Text>
-      <Text backgroundColor={background} color="gray">
-        {fitCell(status, RESULT_STATUS_WIDTH, "left")}
+      <Text backgroundColor={background} color={status.color}>
+        {fitCell(status.symbol, RESULT_STATUS_WIDTH, "left")}
       </Text>
     </Text>
   );
 };
 
 // Key-repeat performance (spec §8.4): a row only re-renders when the entry,
-// its cursor state or its status changes. Widths are part of the check so
-// resizes still re-lay out the rows.
+// its cursor state or its status changes. The status is compared field by
+// field because rowStatus returns a fresh object per render. Widths are part
+// of the check so resizes still re-lay out the rows.
 export const ResultRow = memo(
   ResultRowComponent,
   (previous, next) =>
     previous.entry.id === next.entry.id &&
     previous.number === next.number &&
     previous.isCursor === next.isCursor &&
-    previous.status === next.status &&
+    previous.status.symbol === next.status.symbol &&
+    previous.status.color === next.status.color &&
+    previous.status.kind === next.status.kind &&
     previous.widths.title === next.widths.title &&
     previous.widths.author === next.widths.author &&
     previous.widths.showAuthor === next.widths.showAuthor

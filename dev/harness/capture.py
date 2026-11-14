@@ -14,6 +14,7 @@ Usage:
 Step grammar (a JSON list):
     {"wait": seconds}                  pause, keeps draining output
     {"keys": "...", "after": seconds}  write keys, then pause ("after" defaults to 0.2)
+    {"resize": [cols, rows]}           resize the pty mid-run (SIGWINCH)
     {"snap": "name"}                   drain output and print the screen
 
 Key escapes: down \\u001b[B, up \\u001b[A, right \\u001b[C, left \\u001b[D,
@@ -77,6 +78,14 @@ class Terminal:
         winsize = struct.pack("HHHH", rows, cols, 0, 0)
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, winsize)
 
+    def resize(self, cols, rows):
+        """Resize the pty mid-run; the ioctl raises SIGWINCH in the child."""
+        self.cols = cols
+        self.rows = rows
+        # pyte's Screen.resize takes (lines, columns).
+        self.screen.resize(rows, cols)
+        self.set_winsize(cols, rows)
+
     def pump(self, timeout):
         """Read pending output into the screen for up to `timeout` seconds."""
         deadline = time.monotonic() + timeout
@@ -135,6 +144,10 @@ def run_steps(terminal, steps, cols, rows, key_delay):
     for step in steps:
         if "wait" in step:
             terminal.pump(float(step["wait"]))
+        elif "resize" in step:
+            cols, rows = step["resize"]
+            terminal.resize(int(cols), int(rows))
+            terminal.pump(float(step.get("after", DEFAULT_AFTER)))
         elif "keys" in step:
             terminal.send(step["keys"], float(step.get("delay", key_delay)))
             terminal.pump(float(step.get("after", DEFAULT_AFTER)))

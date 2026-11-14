@@ -65,4 +65,45 @@ export const Label = {
     ["b", "bulk dl"],
     ["?", "help"],
   ] as ReadonlyArray<readonly [string, string]>,
+
+  // Side panel (spec §3)
+  SIDE_PANEL_TAB_DETAIL: "Detail",
+  SIDE_PANEL_TAB_QUEUE: "Queue",
+  SIDE_PANEL_TOGGLE_HINT: "v",
+
+  // Detail panel fields (spec §3); Format is the entry's extension, MD5 is
+  // derived through mirrorAdapter.getEntryMD5 and never the raw mirror URL.
+  DETAIL_FIELD_PUBLISHER: "Publisher",
+  DETAIL_FIELD_YEAR: "Year",
+  DETAIL_FIELD_PAGES: "Pages",
+  DETAIL_FIELD_LANGUAGE: "Language",
+  DETAIL_FIELD_FORMAT: "Format",
+  DETAIL_FIELD_SIZE: "Size",
+  DETAIL_FIELD_MD5: "MD5",
+  DETAIL_MISSING_VALUE: "—",
+  DETAIL_FIELD_SEPARATOR: "·",
+  DETAIL_PAGES_SUFFIX: "pp",
+
+  // One-line download statuses in the detail panel (spec §3: "For queued,
+  // failed or done items, show one status line instead").
+  DETAIL_STATUS_QUEUED: "Queued",
+  DETAIL_STATUS_CONNECTING: "Connecting",
+  DETAIL_STATUS_PROCESSING: "Processing",
+  DETAIL_STATUS_FETCHING: "Fetching",
+  DETAIL_STATUS_WAITING: "Waiting for libgen",
+  DETAIL_STATUS_FAILED: "Failed",
+  DETAIL_STATUS_DONE: "Downloaded",
+
+  // Bulk membership line in the detail panel (spec §3).
+  DETAIL_BULK_MEMBER: "In bulk queue",
+  DETAIL_BULK_MEMBER_HINT: "space to remove",
+  DETAIL_BULK_NONMEMBER: "Not in bulk queue",
+  DETAIL_BULK_NONMEMBER_HINT: "space to add",
+
+  // Detail panel hint pinned to the bottom row (spec §3).
+  DETAIL_PANEL_HINTS: [
+    ["space", "bulk"],
+    ["d", "download"],
+    ["enter", "full screen"],
+  ] as ReadonlyArray<readonly [string, string]>,
 };

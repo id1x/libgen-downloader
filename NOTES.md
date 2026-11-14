@@ -81,3 +81,54 @@ code or left a case unclear. Smallest-change choices, newest last.
   unwired until M3); §6.1 orders the `setEntries()` change in M1 and the
   deletion in M5. `test/search.integration.test.ts` now expects
   `BROWSE_LAYOUT` after `handleSearchSubmit()` (§6.1).
+
+- **M2, `computeLayout` takes the terminal width** — M1's caller passed
+  `terminalColumns - 1` (the padding column), so the §3 breakpoints tested
+  the usable width and a 100-column terminal laid out stacked. `computeLayout`
+  now receives the terminal width: breakpoints test it directly, panel widths
+  share `terminal - 1` (§5.1's `1 + 66 + 53 = 120` puts the padding column in
+  the side panel's share), so a 100-column terminal is wide (56 + 43) and
+  every M1-era capture renders unchanged. M1's width expectations moved by
+  that same padding column (99→98, 59→58, 44→43).
+
+- **M2, `rowStatus` joins the bulk run outcome for `DOWNLOADED` only** — a
+  bulk-selected entry whose MD5 has a terminal outcome in `bulkDownloadQueue`
+  shows ✓ when the run downloaded it (pre-`settleBulkRun` window), but keeps
+  ● when it failed, because §8.3 says "the failed item stays ●" and it stays
+  selected for `r`. Non-terminal bulk outcomes never change the row (the
+  table's ● row). Recorded so M4 does not re-derive this.
+
+- **M2, the "spinner" row label is a static `⠋` frame** — §3's table gives no
+  symbol for CONNECTING/PROCESSING/FETCHING. A live `ink-spinner` per row
+  would fight the row memoisation (§8.4 key repeat), so `rowStatus` returns a
+  static frame with `kind: "spinner"`; a caller that wants animation can
+  swap the symbol by kind.
+
+- **M2, `KeyFooter` separator is two spaces** — the component rendered one
+  space between hint pairs while its own width budget (and §4's footer format
+  strings, e.g. `space bulk  d download`) assume two. Fixed to match; footers
+  and the detail panel's pinned hint now render as the mockups show.
+
+- **M2, header summary is right-aligned** — §3 says "Right: a live summary";
+  M1 rendered it left-hugging right after the mirror host. The summary now
+  pads to the right edge (truncated with the host when the terminal is too
+  narrow), and the `│  ` separator uses §3's two-space form.
+
+- **M2, `MODE=statuses` and a capture.py `resize` step** — M2 wires no
+  download/bulk keys yet (they arrive in M3/M4), so no key path can produce a
+  downloading row for the §5.1 capture. `MODE=statuses` seeds the store after
+  the fashion of §5.1's mix (item 1 done, 2 downloading 42%, 4 queued, 9
+  failed, 3/5/7 bulk-selected) using the deterministic fake entries; it is
+  store seeding only, no new fake behaviour. `capture.py` gained a
+  `{"resize": [cols, rows]}` step (TIOCSWINSZ + pyte screen resize) to verify
+  live-on-resize relayout. `dev/README.md` is outside this ticket's file
+  scope, so the new mode is documented here instead of there.
+
+- **M2, the `v` border hint renders but the key stays unwired** — §7
+  schedules `v` toggling in M4; the hint is display-only this milestone.
+
+- **M2, stacked detail reserves lines 3–4** — the §3 stacked compression
+  reads as a fixed 5-line body: the download block's rows (bar + bytes, or
+  one status line padded to two, or two blanks when there is no direct
+  status) always occupy lines 3–4 so the bulk line stays on line 5 and the
+  panel never reflows.

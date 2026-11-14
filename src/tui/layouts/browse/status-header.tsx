@@ -23,10 +23,9 @@ const mirrorHost = (baseURL: string | undefined): string => {
   }
 };
 
-// Header row of the browse screen (spec §3), normal variant: version and
-// mirror on the left, a live summary that omits zero counts on the right.
-// The compact summary form is used below 100 columns. The bulk-run variant
-// arrives in M4.
+// Header row of the browse screen (spec §3): version and mirror on the left,
+// a live summary that omits zero counts on the right. The compact summary
+// form is used below 100 columns. The bulk-run variant arrives in M4.
 export function StatusHeader() {
   const [terminalColumns] = useStdoutDimensions();
   const mirrorAdapter = useBoundStore((state) => state.mirrorAdapter);
@@ -78,13 +77,47 @@ export function StatusHeader() {
   const activeSegments = segments.filter((segment) => segment.count > 0);
   const isWide = terminalColumns >= WIDE_MIN_COLUMNS;
 
+  // Left part per §3's format string: `libgen-downloader <version>  │  ●
+  // <mirror host>` (two spaces around the separator).
+  const host = mirrorHost(mirrorAdapter?.baseURL);
+  const LEFT_PREFIX = "libgen-downloader ";
+  const LEFT_SEPARATOR = "  │  ";
+  const leftLength =
+    LEFT_PREFIX.length + APP_VERSION.length + LEFT_SEPARATOR.length + 2 + host.length;
+
+  const segmentWidth = (segment: SummarySegment): number => {
+    const countWidth = String(segment.count).length;
+    if (!isWide) {
+      return segment.symbol.length + countWidth;
+    }
+    return segment.symbol.length + 1 + countWidth + 1 + segment.word.length;
+  };
+
+  let summaryLength = 0;
+  for (const [index, segment] of activeSegments.entries()) {
+    if (index > 0) {
+      summaryLength += 3; // " · "
+    }
+    summaryLength += segmentWidth(segment);
+  }
+
+  // The summary is right-aligned (spec §3, "Right: a live summary"); one
+  // space is kept between the parts when they collide, and truncate-end
+  // handles the overflow.
+  const contentWidth = terminalColumns - 1; // AppHeader's paddingLeft
+  let pad = contentWidth - leftLength - summaryLength;
+  if (pad < 1) {
+    pad = 1;
+  }
+
   return (
     <Text wrap="truncate-end">
-      <Text color="white">libgen-downloader </Text>
+      <Text color="white">{LEFT_PREFIX}</Text>
       <Text color="green">{APP_VERSION}</Text>
-      <Text color="gray"> │ </Text>
+      <Text color="gray">{LEFT_SEPARATOR}</Text>
       <Text color="green">● </Text>
-      <Text color="gray">{mirrorHost(mirrorAdapter?.baseURL)}</Text>
+      <Text color="gray">{host}</Text>
+      <Text>{" ".repeat(pad)}</Text>
       {activeSegments.map((segment, index) => (
         <Text key={segment.symbol}>
           {index > 0 && <Text color="gray"> · </Text>}

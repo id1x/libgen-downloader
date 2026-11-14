@@ -26,10 +26,13 @@ export interface ComputeLayoutOptions {
 }
 
 // Breakpoints from spec §3 ("Responsive layout"): ≥ 100 wide side by side,
-// 60–99 stacked, < 60 stacked with the author column hidden.
+// 60–99 stacked, < 60 stacked with the author column hidden. The breakpoints
+// test the terminal width; the 1-column padding the browse screen renders on
+// the left comes out of the panel widths (§5.1: 1 + 66 + 53 = 120).
 export const WIDE_MIN_COLUMNS = 100;
 const COMPACT_MAX_COLUMNS = 59;
 
+const PADDING_COLUMNS = 1;
 const RESULTS_WIDTH_SHARE = 0.55;
 const RESULTS_MIN_WIDTH = 56;
 
@@ -95,14 +98,19 @@ export const computeLayout = (
     mode = "compact";
   }
 
-  let resultsWidth = columns;
+  // The panels share the usable width (terminal minus the left padding).
+  const usableWidth = columns - PADDING_COLUMNS;
+
+  let resultsWidth = usableWidth;
   if (mode === "wide") {
+    // The results panel takes its share of the terminal width; the padding
+    // column comes out of the side panel's share.
     resultsWidth = Math.max(Math.floor(columns * RESULTS_WIDTH_SHARE), RESULTS_MIN_WIDTH);
   }
 
-  let sideWidth = columns;
+  let sideWidth = usableWidth;
   if (mode === "wide") {
-    sideWidth = columns - resultsWidth;
+    sideWidth = usableWidth - resultsWidth;
   }
 
   let reservedRows = SPARE_ROWS + HEADER_ROWS + SEARCH_LINE_ROWS + FOOTER_ROWS;
