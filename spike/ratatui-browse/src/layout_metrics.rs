@@ -52,7 +52,7 @@ pub struct Metrics {
 pub fn compute_main(main: Rect, mode: Mode, queue_panel: bool) -> Metrics {
     match mode {
         Mode::Wide => {
-            let results_w = (main.width * 55 / 100).max(56).min(main.width.saturating_sub(20));
+            let results_w = (main.width * 55 / 100).max(56);
             let [results, side] = Layout::horizontal([Constraint::Length(results_w), Constraint::Min(0)])
                 .areas(main);
             Metrics { mode, results, side }
