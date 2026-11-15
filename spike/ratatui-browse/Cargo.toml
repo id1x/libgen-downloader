@@ -1,0 +1,12 @@
+[package]
+name = "ratatui-browse-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# PROTOTYPE — throwaway spike for wayfinder ticket #15
+# ("Does the master/detail TUI spec translate cleanly to ratatui?").
+# Not part of the app. Do not ship.
+
+[dependencies]
+ratatui = "0.30"
